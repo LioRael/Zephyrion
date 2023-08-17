@@ -1,0 +1,10 @@
+auto-pick-items: zephyrion.auto-pick-items
+#search-items: zephyrion.search-items
+
+give-workspace-quota: zephyrion.give-workspace-quota
+give-unlimited-size-quota: zephyrion.give-unlimited-size-quota
+give-size-quota: zephyrion.give-size-quota
+
+create-public-workspace: zephyrion.create-public-workspace
+create-private-workspace: zephyrion.create-private-workspace
+create-independent-workspace: zephyrion.create-independent-workspace

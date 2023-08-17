@@ -1,0 +1,38 @@
+database:
+  # mysql, sqlite
+  type: sqlite
+  host: localhost
+  port: 3306
+  name: database
+  username: root
+  password: password
+
+workspace:
+  independent: false
+  name:
+    allow-color: false
+    min-length: 3
+    max-length: 16
+    blacklist:
+      - independent
+      - banned
+      - name
+      - list
+      - here
+
+vault:
+  name:
+    allow-color: false
+    min-length: 3
+    max-length: 16
+    blacklist:
+      - banned
+      - name
+      - list
+      - here
+
+user:
+  default-quotas:
+    unlimited: 0
+    workspace: 1
+    size: 200
