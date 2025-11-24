@@ -9,13 +9,14 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Basic
+import taboolib.module.ui.type.Chest
+import taboolib.module.ui.type.impl.ChestImpl
 import taboolib.platform.util.*
 
-class AdminWorkspace(val owner: Player, val workspace: Workspace, val root: UI) : UI() {
+class AdminWorkspace(override val opener: Player, val workspace: Workspace, val root: UI) : UI() {
 
     override fun build(): Inventory {
-        return buildMenu<Basic>(title()) {
+        return buildMenu<ChestImpl>(title()) {
             setProperties(this)
             setInfomationItem(this)
             setSplitBlock(this)
@@ -27,7 +28,7 @@ class AdminWorkspace(val owner: Player, val workspace: Workspace, val root: UI) 
         }
     }
 
-    fun setProperties(menu: Basic) {
+    fun setProperties(menu: Chest) {
         menu.rows(3)
         menu.handLocked(true)
         menu.map(
@@ -40,11 +41,11 @@ class AdminWorkspace(val owner: Player, val workspace: Workspace, val root: UI) 
         }
     }
 
-    fun setInfomationItem(menu: Basic) {
+    fun setInfomationItem(menu: Chest) {
         menu.set('I') {
             buildItem(XMaterial.BOOK) {
-                name = owner.asLangText("workspace-admin-info-name")
-                lore += owner.asLangTextList(
+                name = opener.asLangText("workspace-admin-info-name")
+                lore += opener.asLangTextList(
                     "workspace-admin-info-desc",
                     workspace.id,
                     workspace.name,
@@ -58,121 +59,121 @@ class AdminWorkspace(val owner: Player, val workspace: Workspace, val root: UI) 
         }
     }
 
-    fun setNameItem(menu: Basic) {
+    fun setNameItem(menu: Chest) {
         menu.set('N') {
             buildItem(XMaterial.PAPER) {
-                name = owner.asLangText("workspace-admin-reset-name")
+                name = opener.asLangText("workspace-admin-reset-name")
             }
         }
         menu.onClick('N') { event ->
-            owner.closeInventory()
-            owner.sendLang("workspace-admin-input-name")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-admin-input-name")
+            opener.nextChat {
                 sync {
                     val result = workspace.rename(it)
                     when (result.reason) {
                         "workspace_name_invalid" -> {
-                            owner.sendLang("workspace-admin-reset-name-invalid")
+                            opener.sendLang("workspace-admin-reset-name-invalid")
                         }
 
                         "workspace_name_color" -> {
-                            owner.sendLang("workspace-admin-reset-name-color")
+                            opener.sendLang("workspace-admin-reset-name-color")
                         }
 
                         "workspace_name_length" -> {
-                            owner.sendLang("workspace-admin-reset-name-length")
+                            opener.sendLang("workspace-admin-reset-name-length")
                         }
 
                         "workspace_already_exists" -> {
-                            owner.sendLang("workspace-admin-reset-name-existed")
+                            opener.sendLang("workspace-admin-reset-name-existed")
                         }
 
                         null -> {
-                            owner.sendLang("workspace-admin-reset-name-succeed")
+                            opener.sendLang("workspace-admin-reset-name-succeed")
                         }
                     }
-                    open(event.clicker)
+                    open()
                 }
             }
         }
     }
 
-    fun setDescItem(menu: Basic) {
+    fun setDescItem(menu: Chest) {
         menu.set('D') {
             buildItem(XMaterial.PAPER) {
-                name = owner.asLangText("workspace-admin-reset-desc")
+                name = opener.asLangText("workspace-admin-reset-desc")
             }
         }
         menu.onClick('C') { event ->
-            owner.closeInventory()
-            owner.sendLang("workspace-admin-input-desc")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-admin-input-desc")
+            opener.nextChat {
                 sync {
                     transaction {
                         workspace.desc = it
                         workspace.updatedAt = System.currentTimeMillis()
                     }
-                    owner.sendLang("workspace-admin-reset-desc-succeed")
-                    open(event.clicker)
+                    opener.sendLang("workspace-admin-reset-desc-succeed")
+                    open()
                 }
             }
         }
     }
 
-    fun setMembersItem(menu: Basic) {
+    fun setMembersItem(menu: Chest) {
         menu.set('M') {
             buildItem(XMaterial.PLAYER_HEAD) {
-                name = owner.asLangText("workspace-admin-members")
+                name = opener.asLangText("workspace-admin-members")
             }
         }
         menu.onClick('M') {
-            ListMembers(owner, workspace, this).open(it.clicker)
+            ListMembers(opener, workspace, this).open()
         }
     }
 
-    fun setDeleteItem(menu: Basic) {
+    fun setDeleteItem(menu: Chest) {
         menu.set('E') {
             buildItem(XMaterial.BARRIER) {
-                name = owner.asLangText("workspace-admin-delete")
+                name = opener.asLangText("workspace-admin-delete")
             }
         }
         menu.onClick('E') { event ->
-            owner.closeInventory()
-            owner.sendLang("workspace-admin-delete-tip")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-admin-delete-tip")
+            opener.nextChat {
                 if (it == "Y") {
                     workspace.delete()
-                    owner.sendLang("workspace-admin-delete-succeed")
+                    opener.sendLang("workspace-admin-delete-succeed")
                     sync {
-                        root.open(event.clicker)
+                        root.open()
                     }
                 } else {
-                    owner.sendMessage("workspace-admin-delete-canceled")
+                    opener.sendLang("workspace-admin-delete-canceled")
                     sync {
-                        root.open(event.clicker)
+                        root.open()
                     }
                 }
             }
         }
     }
 
-    fun setReturnItem(menu: Basic) {
+    fun setReturnItem(menu: Chest) {
         menu.set('R') {
             buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = owner.asLangText("workspace-admin-return")
+                name = opener.asLangText("workspace-admin-return")
             }
         }
         menu.onClick('R') {
-            root.open(it.clicker)
+            root.open()
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 
     override fun title(): String {
-        return owner.asLangText("workspace-admin-title")
+        return opener.asLangText("workspace-admin-title")
     }
 
 }

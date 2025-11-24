@@ -9,19 +9,20 @@ import org.bukkit.inventory.Inventory
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Basic
+import taboolib.module.ui.type.Chest
+import taboolib.module.ui.type.impl.ChestImpl
 import taboolib.platform.util.asLangText
 import taboolib.platform.util.buildItem
 import taboolib.platform.util.nextChat
 import taboolib.platform.util.sendLang
 
-class CreateVault(val owner: Player, val workspace: Workspace, val root: UI? = null) : UI() {
+class CreateVault(override val opener: Player, val workspace: Workspace, val root: UI? = null) : UI() {
 
     var name: String? = null
     var description: String? = null
 
     override fun build(): Inventory {
-        return buildMenu<Basic>(title()) {
+        return buildMenu<ChestImpl>(title()) {
             setProperties(this)
             setInfomationItem(this)
             setSplitBlock(this)
@@ -32,7 +33,7 @@ class CreateVault(val owner: Player, val workspace: Workspace, val root: UI? = n
         }
     }
 
-    fun setProperties(menu: Basic) {
+    fun setProperties(menu: Chest) {
         menu.rows(3)
         menu.handLocked(true)
         menu.map(
@@ -45,105 +46,105 @@ class CreateVault(val owner: Player, val workspace: Workspace, val root: UI? = n
         }
     }
 
-    fun setInfomationItem(menu: Basic) {
+    fun setInfomationItem(menu: Chest) {
         menu.set('I') {
             buildItem(XMaterial.BOOK) {
-                name = owner.asLangText("vaults-create-item-info-name")
+                name = opener.asLangText("vaults-create-item-info-name")
                 name?.let {
-                    lore += owner.asLangText("vaults-create-item-info-lore-name", it)
+                    lore += opener.asLangText("vaults-create-item-info-lore-name", it)
                 }
                 name?.let {
-                    lore += owner.asLangText("vaults-create-item-info-lore-desc", it)
+                    lore += opener.asLangText("vaults-create-item-info-lore-desc", it)
                 }
             }
         }
     }
 
-    fun setNameItem(menu: Basic) {
+    fun setNameItem(menu: Chest) {
         menu.set('N') {
             buildItem(XMaterial.PAPER) {
                 name = if (name != null) {
-                    owner.asLangText("vaults-create-reset-name")
+                    opener.asLangText("vaults-create-reset-name")
                 } else {
-                    owner.asLangText("vaults-create-set-name")
+                    opener.asLangText("vaults-create-set-name")
                 }
             }
         }
         menu.onClick('N') { event ->
-            owner.closeInventory()
-            owner.sendLang("vaults-create-input-name")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("vaults-create-input-name")
+            opener.nextChat {
                 sync {
                     name = it
-                    open(event.clicker)
+                    open()
                 }
             }
         }
     }
 
-    fun setDescItem(menu: Basic) {
+    fun setDescItem(menu: Chest) {
         menu.set('D') {
             buildItem(XMaterial.PAPER) {
                 name = if (description != null) {
-                    owner.asLangText("vaults-create-reset-desc")
+                    opener.asLangText("vaults-create-reset-desc")
                 } else {
-                    owner.asLangText("vaults-create-set-desc")
+                    opener.asLangText("vaults-create-set-desc")
                 }
             }
         }
         menu.onClick('D') { event ->
-            owner.closeInventory()
-            owner.sendLang("vaults-create-input-desc")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("vaults-create-input-desc")
+            opener.nextChat {
                 sync {
                     description = it
-                    open(event.clicker)
+                    open()
                 }
             }
         }
     }
 
-    fun setReturnItem(menu: Basic) {
+    fun setReturnItem(menu: Chest) {
         menu.set('R') {
             buildItem(XMaterial.BARRIER) {
-                name = owner.asLangText("vaults-create-return")
+                name = opener.asLangText("vaults-create-return")
             }
         }
         menu.onClick('R') {
-            owner.closeInventory()
-            root?.open(it.clicker)
+            it.clicker.closeInventory()
+            root?.open()
         }
     }
 
-    fun setConfirmItem(menu: Basic) {
+    fun setConfirmItem(menu: Chest) {
         menu.set('C') {
             buildItem(XMaterial.GREEN_STAINED_GLASS_PANE) {
-                name = owner.asLangText("vaults-create-confirm")
+                name = opener.asLangText("vaults-create-confirm")
             }
         }
         menu.onClick('C') {
             val result = ZephyrionAPI.createVault(workspace, name, description)
             when (result.reason) {
-                "vault_name_invalid" -> owner.sendLang("vaults-create-name-invalid")
-                "vault_already_exists" -> owner.sendLang("vaults-create-name-existed")
-                "vault_name_color" -> owner.sendLang("vaults-create-name-color")
-                "vault_name_length" -> owner.sendLang("vaults-create-name-length")
-                "vault_name_blacklist" -> owner.sendLang("vaults-create-name-blacklist")
+                "vault_name_invalid" -> opener.sendLang("vaults-create-name-invalid")
+                "vault_already_exists" -> opener.sendLang("vaults-create-name-existed")
+                "vault_name_color" -> opener.sendLang("vaults-create-name-color")
+                "vault_name_length" -> opener.sendLang("vaults-create-name-length")
+                "vault_name_blacklist" -> opener.sendLang("vaults-create-name-blacklist")
                 null -> {
-                    owner.sendLang("vaults-create-succeed")
-                    owner.closeInventory()
-                    root?.open(it.clicker)
+                    opener.sendLang("vaults-create-succeed")
+                    opener.closeInventory()
+                    root?.open()
                 }
             }
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 
     override fun title(): String {
-        return owner.asLangText("vaults-create-title")
+        return opener.asLangText("vaults-create-title")
     }
 
 }

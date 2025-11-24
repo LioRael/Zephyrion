@@ -181,6 +181,131 @@ object ZephyrionAPI {
     }
 
     fun isPluginAdmin(opener: Player): Boolean {
-        return opener.hasPermission(Zephyrion.settings.getString("permissions.admin")!!)
+        return opener.hasPermission(Zephyrion.permissions.getString("admin")!!)
+    }
+
+    // ==================== 配额管理 API ====================
+
+    /**
+     * 设置玩家的工作空间配额
+     */
+    fun setWorkspaceQuota(playerUniqueId: String, quota: Int): Boolean {
+        return Quota.setWorkspaceQuota(playerUniqueId, quota)
+    }
+
+    /**
+     * 增加玩家的工作空间配额
+     */
+    fun addWorkspaceQuota(playerUniqueId: String, amount: Int): Boolean {
+        return Quota.addWorkspaceQuota(playerUniqueId, amount)
+    }
+
+    /**
+     * 减少玩家的工作空间配额
+     */
+    fun removeWorkspaceQuota(playerUniqueId: String, amount: Int): Boolean {
+        return Quota.removeWorkspaceQuota(playerUniqueId, amount)
+    }
+
+    /**
+     * 设置玩家的容量配额
+     */
+    fun setSizeQuota(playerUniqueId: String, quota: Int): Boolean {
+        return Quota.setSizeQuota(playerUniqueId, quota)
+    }
+
+    /**
+     * 增加玩家的容量配额
+     */
+    fun addSizeQuota(playerUniqueId: String, amount: Int): Boolean {
+        return Quota.addSizeQuota(playerUniqueId, amount)
+    }
+
+    /**
+     * 减少玩家的容量配额
+     */
+    fun removeSizeQuota(playerUniqueId: String, amount: Int): Boolean {
+        return Quota.removeSizeQuota(playerUniqueId, amount)
+    }
+
+    /**
+     * 设置玩家的无限配额状态
+     */
+    fun setUnlimited(playerUniqueId: String, unlimited: Boolean): Boolean {
+        return Quota.setUnlimited(playerUniqueId, unlimited)
+    }
+
+    /**
+     * 重置玩家的配额为默认值
+     */
+    fun resetQuota(playerUniqueId: String): Boolean {
+        return Quota.resetQuota(playerUniqueId)
+    }
+
+    // ==================== 自动拾取管理 API ====================
+
+    /**
+     * 获取保险库的所有自动拾取规则
+     */
+    fun getAutoPickups(vault: Vault): List<AutoPickup> {
+        return AutoPickup.getAutoPickups(vault)
+    }
+
+    /**
+     * 获取保险库的指定类型的自动拾取规则
+     */
+    fun getAutoPickupsByType(vault: Vault, type: AutoPickups.Type): List<AutoPickup> {
+        return AutoPickup.getAutoPickupsByType(vault, type)
+    }
+
+    /**
+     * 创建自动拾取规则
+     */
+    fun createAutoPickup(vault: Vault, type: AutoPickups.Type, value: String): Result {
+        val result = AutoPickup.createAutoPickup(vault, type, value)
+        if (result.success) {
+            com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()
+        }
+        return result
+    }
+
+    /**
+     * 删除自动拾取规则
+     */
+    fun deleteAutoPickup(autoPickup: AutoPickup): Boolean {
+        val success = autoPickup.deleteRule()
+        if (success) {
+            com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()
+        }
+        return success
+    }
+
+    /**
+     * 删除保险库的所有自动拾取规则
+     */
+    fun clearAutoPickups(vault: Vault): Int {
+        val count = AutoPickup.clearAutoPickups(vault)
+        if (count > 0) {
+            com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()
+        }
+        return count
+    }
+
+    /**
+     * 更新自动拾取规则的值
+     */
+    fun updateAutoPickup(autoPickup: AutoPickup, newValue: String): Result {
+        val result = autoPickup.updateValue(newValue)
+        if (result.success) {
+            com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()
+        }
+        return result
+    }
+
+    /**
+     * 检查物品是否匹配自动拾取规则
+     */
+    fun shouldAutoPickup(itemStack: ItemStack, vault: Vault): Boolean? {
+        return AutoPickup.shouldAutoPickup(itemStack, vault)
     }
 }

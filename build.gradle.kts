@@ -1,30 +1,44 @@
+import io.izzel.taboolib.gradle.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     `java-library`
     `maven-publish`
-    id("io.izzel.taboolib") version "1.56"
+    id("io.izzel.taboolib") version "2.0.27"
     kotlin("jvm") version "1.9.0"
 }
 
 val exposedVersion: String by project
 
 taboolib {
-    install("common")
-    install("common-5")
-    install("module-chat")
-    install("module-configuration")
-    install("module-kether")
-    install("module-lang")
-    install("module-metrics")
-    install("module-nms")
-    install("module-nms-util")
-    install("module-ui")
-    install("platform-bukkit")
-    install("expansion-command-helper")
-    options("enable-isolated-classloader", "skip-kotlin-relocate")
-    classifier = null
-    version = "6.0.11-31"
+    env {
+        install(
+            Basic,
+            Bukkit,
+            BukkitHook,
+            BukkitNMS,
+            BukkitNMSUtil,
+            BukkitUI,
+            BukkitUtil,
+            CommandHelper,
+            I18n,
+            Kether,
+            MinecraftChat,
+            Metrics,
+
+        )
+        enableIsolatedClassloader  = true
+    }
+    version {
+        taboolib = "6.2.4-abd325ee"
+        skipKotlinRelocate = true
+    }
+    description{
+        contributors {
+            name("LioRael")
+            name("Sting")
+        }
+    }
 }
 
 repositories {
@@ -32,14 +46,18 @@ repositories {
 }
 
 dependencies {
+    compileOnly("ink.ptms.core:v12107:12107:universal")
+    compileOnly("ink.ptms.core:v12107:12107:mapped")
+    compileOnly("ink.ptms.core:v12004:12004:universal")
+    compileOnly("ink.ptms.core:v12004:12004:mapped")
+    compileOnly("ink.ptms:nms-all:1.0.0")
+
     compileOnly("com.google.code.gson:gson:2.10")
     compileOnly("com.zaxxer:HikariCP:5.0.1")
     compileOnly("org.jetbrains.exposed:exposed-core:$exposedVersion")
     compileOnly("org.jetbrains.exposed:exposed-dao:$exposedVersion")
     compileOnly("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    compileOnly("ink.ptms:nms-all:1.0.0")
-    compileOnly("ink.ptms.core:v12001:12001:universal")
-    compileOnly("ink.ptms.core:v12001:12001:mapped")
+
     compileOnly(kotlin("stdlib"))
     compileOnly(fileTree("libs"))
 }

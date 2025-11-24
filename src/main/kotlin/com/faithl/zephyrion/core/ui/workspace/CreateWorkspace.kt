@@ -10,21 +10,25 @@ import org.bukkit.inventory.Inventory
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Basic
-import taboolib.module.ui.type.Linked
+import taboolib.module.ui.type.Chest
+import taboolib.module.ui.type.impl.ChestImpl
+import taboolib.module.ui.type.impl.PageableChestImpl
 import taboolib.platform.util.asLangText
 import taboolib.platform.util.buildItem
 import taboolib.platform.util.nextChat
 import taboolib.platform.util.sendLang
 
-class CreateWorkspace(val owner: Player, val root: UI) : UI() {
+/**
+ * @param opener 打开UI的玩家
+ */
+class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
 
     var name: String? = null
     var description: String? = null
     var type: Workspaces.Type? = null
 
     override fun build(): Inventory {
-        return buildMenu<Basic>(title()) {
+        return buildMenu<ChestImpl>(title()) {
             setProperties(this)
             setInfomationItem(this)
             setSplitBlock(this)
@@ -36,9 +40,9 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
         }
     }
 
-    class TypeUI(val opener: Player, val root: CreateWorkspace) : UI() {
+    class TypeUI(override val opener: Player, val root: CreateWorkspace) : UI() {
         override fun build(): Inventory {
-            return buildMenu<Linked<Workspaces.Type>>(title()) {
+            return buildMenu<PageableChestImpl<Workspaces.Type>>(title()) {
                 rows(1)
                 handLocked(true)
                 slots(listOf(0, 1, 2))
@@ -75,7 +79,7 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
                         Workspaces.Type.INDEPENDENT -> {
                             if (opener.hasPermission(Zephyrion.permissions.getString("create-independent-workspace")!!)) {
                                 root.type = element
-                                root.open(opener)
+                                root.open()
                             } else {
                                 opener.sendLang("workspace-create-type-no-permission")
                             }
@@ -84,7 +88,7 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
                         Workspaces.Type.PUBLIC -> {
                             if (opener.hasPermission(Zephyrion.permissions.getString("create-public-workspace")!!)) {
                                 root.type = element
-                                root.open(opener)
+                                root.open()
                             } else {
                                 opener.sendLang("workspace-create-type-no-permission")
                             }
@@ -93,7 +97,7 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
                         Workspaces.Type.PRIVATE -> {
                             if (opener.hasPermission(Zephyrion.permissions.getString("create-private-workspace")!!)) {
                                 root.type = element
-                                root.open(opener)
+                                root.open()
                             } else {
                                 opener.sendLang("workspace-create-type-no-permission")
                             }
@@ -103,7 +107,7 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
             }
         }
 
-        override fun open(opener: Player) {
+        override fun open() {
             val inv = build()
             opener.openInventory(inv)
         }
@@ -114,19 +118,19 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
 
     }
 
-    fun setTypeItem(menu: Basic) {
+    fun setTypeItem(menu: Chest) {
         menu.set('T') {
             buildItem(XMaterial.PAPER) {
-                name = owner.asLangText("workspace-create-type-name")
-                lore += owner.asLangText("workspace-create-type-current", type.toString())
+                name = opener.asLangText("workspace-create-type-name")
+                lore += opener.asLangText("workspace-create-type-current", type.toString())
             }
         }
         menu.onClick('T') {
-            TypeUI(owner, this).open(owner)
+            TypeUI(opener, this).open()
         }
     }
 
-    fun setProperties(menu: Basic) {
+    fun setProperties(menu: Chest) {
         menu.rows(3)
         menu.handLocked(true)
         menu.map(
@@ -139,113 +143,113 @@ class CreateWorkspace(val owner: Player, val root: UI) : UI() {
         }
     }
 
-    fun setInfomationItem(menu: Basic) {
+    fun setInfomationItem(menu: Chest) {
         menu.set('I') {
             buildItem(XMaterial.BOOK) {
-                name = owner.asLangText("workspace-create-info-name")
+                name = opener.asLangText("workspace-create-info-name")
                 this@CreateWorkspace.name?.let {
-                    lore += owner.asLangText("workspace-create-info-lore-name", it)
+                    lore += opener.asLangText("workspace-create-info-lore-name", it)
                 }
                 description?.let {
-                    lore += owner.asLangText("workspace-create-info-lore-desc", it)
+                    lore += opener.asLangText("workspace-create-info-lore-desc", it)
                 }
-                lore += owner.asLangText("workspace-create-info-lore-member", owner.name)
+                lore += opener.asLangText("workspace-create-info-lore-member", opener.name)
             }
         }
     }
 
-    fun setNameItem(menu: Basic) {
+    fun setNameItem(menu: Chest) {
         menu.set('N') {
             buildItem(XMaterial.PAPER) {
                 name = if (this@CreateWorkspace.name != null) {
-                    owner.asLangText("workspace-create-reset-name")
+                    opener.asLangText("workspace-create-reset-name")
                 } else {
-                    owner.asLangText("workspace-create-set-name")
+                    opener.asLangText("workspace-create-set-name")
                 }
             }
         }
         menu.onClick('N') { event ->
-            owner.closeInventory()
-            owner.sendLang("workspace-create-input-name")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-create-input-name")
+            opener.nextChat {
                 sync {
                     name = it
-                    open(event.clicker)
+                    open()
                 }
             }
         }
     }
 
-    fun setDescItem(menu: Basic) {
+    fun setDescItem(menu: Chest) {
         menu.set('D') {
             buildItem(XMaterial.PAPER) {
                 name = if (description != null) {
-                    owner.asLangText("workspace-create-reset-desc")
+                    opener.asLangText("workspace-create-reset-desc")
                 } else {
-                    owner.asLangText("workspace-create-set-desc")
+                    opener.asLangText("workspace-create-set-desc")
                 }
             }
         }
         menu.onClick('D') { event ->
-            owner.closeInventory()
-            owner.sendLang("workspace-create-input-desc")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-create-input-desc")
+            opener.nextChat {
                 sync {
                     description = it
-                    open(event.clicker)
+                    open()
                 }
             }
         }
     }
 
-    fun setReturnItem(menu: Basic) {
+    fun setReturnItem(menu: Chest) {
         menu.set('R') {
             buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = owner.asLangText("workspace-create-return")
+                name = opener.asLangText("workspace-create-return")
             }
         }
         menu.onClick('R') {
-            root.open(it.clicker)
+            root.open()
         }
     }
 
-    fun setConfirmItem(menu: Basic) {
+    fun setConfirmItem(menu: Chest) {
         menu.set('C') {
             buildItem(XMaterial.GREEN_STAINED_GLASS_PANE) {
-                name = owner.asLangText("workspace-create-confirm")
+                name = opener.asLangText("workspace-create-confirm")
             }
         }
         menu.onClick('C') {
-            val result = ZephyrionAPI.createWorkspace(owner.uniqueId.toString(), name, type, description)
+            val result = ZephyrionAPI.createWorkspace(opener.uniqueId.toString(), name, type, description)
             when (result.reason) {
-                "workspace_quota_exceeded" -> owner.sendLang("workspace-create-quota-exceeded")
+                "workspace_quota_exceeded" -> opener.sendLang("workspace-create-quota-exceeded")
 
-                "workspace_already_exists" -> owner.sendLang("workspace-create-name-existed")
+                "workspace_already_exists" -> opener.sendLang("workspace-create-name-existed")
 
-                "workspace_name_invalid" -> owner.sendLang("workspace-create-name-invalid")
+                "workspace_name_invalid" -> opener.sendLang("workspace-create-name-invalid")
 
-                "workspace_name_color" -> owner.sendLang("workspace-create-name-color")
+                "workspace_name_color" -> opener.sendLang("workspace-create-name-color")
 
-                "workspace_name_length" -> owner.sendLang("workspace-create-name-length")
+                "workspace_name_length" -> opener.sendLang("workspace-create-name-length")
 
-                "workspace_name_blacklist" -> owner.sendLang("workspace-create-name-blacklist")
+                "workspace_name_blacklist" -> opener.sendLang("workspace-create-name-blacklist")
 
-                "workspace_type_invalid" -> owner.sendLang("workspace-create-type-invalid")
+                "workspace_type_invalid" -> opener.sendLang("workspace-create-type-invalid")
 
                 null -> {
-                    owner.sendLang("workspace-create-succeed")
-                    root.open(it.clicker)
+                    opener.sendLang("workspace-create-succeed")
+                    root.open()
                 }
             }
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 
     override fun title(): String {
-        return owner.asLangText("workspace-create-title")
+        return opener.asLangText("workspace-create-title")
     }
 
 }

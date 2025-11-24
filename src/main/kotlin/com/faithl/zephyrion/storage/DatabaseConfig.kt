@@ -8,9 +8,10 @@ import taboolib.common.env.RuntimeDependencies
 import taboolib.common.env.RuntimeDependency
 
 @RuntimeDependencies(
-    RuntimeDependency("org.jetbrains.exposed:exposed-core:0.41.1", isolated = true),
-    RuntimeDependency("org.jetbrains.exposed:exposed-dao:0.41.1", isolated = true),
-    RuntimeDependency("org.jetbrains.exposed:exposed-jdbc:0.41.1", isolated = true),
+    RuntimeDependency("org.jetbrains.exposed:exposed-core:0.41.1"),
+    RuntimeDependency("org.jetbrains.exposed:exposed-dao:0.41.1"),
+    RuntimeDependency("org.jetbrains.exposed:exposed-jdbc:0.41.1"),
+    RuntimeDependency("org.jetbrains.kotlin:kotlin-reflect:1.9.0"),
 )
 object DatabaseConfig {
 

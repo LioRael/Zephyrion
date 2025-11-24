@@ -53,7 +53,7 @@ class Workspace(id: EntityID<Int>) : IntEntity(id) {
 
         fun getIndependentWorkspace(): Workspace? {
             return transaction {
-                find { Workspaces.name eq "independent" }.firstOrNull()
+                find { Workspaces.name eq "Independent" }.firstOrNull()
             }
         }
 
@@ -143,10 +143,11 @@ class Workspace(id: EntityID<Int>) : IntEntity(id) {
     }
 
     override fun delete() {
+        val user =  ZephyrionAPI.getUserData(owner)
         transaction {
             super.delete()
+            user.workspaceUsed -= 1
         }
-        ZephyrionAPI.getUserData(owner).workspaceUsed -= 1
     }
 
     fun isMember(toString: String): Boolean {

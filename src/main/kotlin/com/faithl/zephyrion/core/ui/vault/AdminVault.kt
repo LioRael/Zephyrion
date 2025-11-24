@@ -9,29 +9,31 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Basic
+import taboolib.module.ui.type.Chest
+import taboolib.module.ui.type.impl.ChestImpl
 import taboolib.platform.util.*
 
-class AdminVault(val owner: Player, val vault: Vault, val root: UI? = null) : UI() {
+class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = null) : UI() {
 
     override fun build(): Inventory {
-        return buildMenu<Basic>(title()) {
+        return buildMenu<ChestImpl>(title()) {
             setProperties(this)
             setInfomationItem(this)
             setSplitBlock(this)
             setNameItem(this)
             setDescItem(this)
+            setAutoPickupItem(this)
             setReturnItem(this)
             setDeleteItem(this)
         }
     }
 
-    fun setProperties(menu: Basic) {
+    fun setProperties(menu: Chest) {
         menu.rows(3)
         menu.handLocked(true)
         menu.map(
             "#########",
-            "ND      E",
+            "NDA     E",
             "####I###R"
         )
         menu.onClick {
@@ -39,11 +41,11 @@ class AdminVault(val owner: Player, val vault: Vault, val root: UI? = null) : UI
         }
     }
 
-    fun setInfomationItem(menu: Basic) {
+    fun setInfomationItem(menu: Chest) {
         menu.set('I') {
             buildItem(XMaterial.BOOK) {
-                name = owner.asLangText("vaults-admin-info-name")
-                lore += owner.asLangTextList(
+                name = opener.asLangText("vaults-admin-info-name")
+                lore += opener.asLangTextList(
                     "vaults-admin-info-desc",
                     vault.id,
                     vault.name,
@@ -55,27 +57,27 @@ class AdminVault(val owner: Player, val vault: Vault, val root: UI? = null) : UI
         }
     }
 
-    fun setNameItem(menu: Basic) {
+    fun setNameItem(menu: Chest) {
         menu.set('N') {
             buildItem(XMaterial.PAPER) {
-                name = owner.asLangText("vaults-admin-reset-name")
+                name = opener.asLangText("vaults-admin-reset-name")
             }
         }
         menu.onClick('N') { event ->
-            owner.closeInventory()
-            owner.sendLang("vaults-admin-input-name")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("vaults-admin-input-name")
+            opener.nextChat {
                 sync {
                     val result = vault.rename(it)
                     when (result.reason) {
-                        "vault_name_invalid" -> owner.sendLang("vaults-admin-reset-name-invalid")
-                        "vault_already_exists" -> owner.sendLang("vaults-admin-reset-name-existed")
-                        "vault_name_color" -> owner.sendLang("vaults-admin-reset-name-color")
-                        "vault_name_length" -> owner.sendLang("vaults-admin-reset-name-length")
+                        "vault_name_invalid" -> opener.sendLang("vaults-admin-reset-name-invalid")
+                        "vault_already_exists" -> opener.sendLang("vaults-admin-reset-name-existed")
+                        "vault_name_color" -> opener.sendLang("vaults-admin-reset-name-color")
+                        "vault_name_length" -> opener.sendLang("vaults-admin-reset-name-length")
                         null -> {
-                            owner.sendLang("vaults-admin-reset-name-succeed")
-                            owner.closeInventory()
-                            root?.open(event.clicker)
+                            opener.sendLang("vaults-admin-reset-name-succeed")
+                            opener.closeInventory()
+                            root?.open()
                         }
                     }
                 }
@@ -83,72 +85,84 @@ class AdminVault(val owner: Player, val vault: Vault, val root: UI? = null) : UI
         }
     }
 
-    fun setDescItem(menu: Basic) {
+    fun setDescItem(menu: Chest) {
         menu.set('D') {
             buildItem(XMaterial.PAPER) {
-                name = owner.asLangText("vaults-admin-reset-desc")
+                name = opener.asLangText("vaults-admin-reset-desc")
             }
         }
         menu.onClick('D') { event ->
-            owner.closeInventory()
-            owner.sendLang("vaults-admin-input-desc")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("vaults-admin-input-desc")
+            opener.nextChat {
                 sync {
                     transaction {
                         vault.desc = it
                         vault.updatedAt = System.currentTimeMillis()
                     }
-                    owner.sendLang("vaults-admin-reset-desc-succeed")
-                    owner.closeInventory()
-                    root?.open(event.clicker)
+                    opener.sendLang("vaults-admin-reset-desc-succeed")
+                    opener.closeInventory()
+                    root?.open()
                 }
             }
         }
     }
 
-    fun setReturnItem(menu: Basic) {
-        menu.set('R') {
-            buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = owner.asLangText("vaults-admin-return")
+    fun setAutoPickupItem(menu: Chest) {
+        menu.set('A') {
+            buildItem(XMaterial.HOPPER) {
+                name = opener.asLangText("vaults-admin-auto-pickup")
+                lore += opener.asLangTextList("vaults-admin-auto-pickup-desc")
             }
         }
-        menu.onClick('R') {
-            owner.closeInventory()
-            root?.open(it.clicker)
+        menu.onClick('A') {
+            ListAutoPickups(opener, vault, this).open()
         }
     }
 
-    fun setDeleteItem(menu: Basic) {
+    fun setReturnItem(menu: Chest) {
+        menu.set('R') {
+            buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
+                name = opener.asLangText("vaults-admin-return")
+            }
+        }
+        menu.onClick('R') {
+            opener.closeInventory()
+            root?.open()
+        }
+    }
+
+    fun setDeleteItem(menu: Chest) {
         menu.set('E') {
             buildItem(XMaterial.BARRIER) {
-                name = owner.asLangText("vaults-admin-delete")
+                name = opener.asLangText("vaults-admin-delete")
             }
         }
         menu.onClick('E') { event ->
-            owner.closeInventory()
-            owner.sendLang("vaults-admin-delete-tip")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("vaults-admin-delete-tip")
+            opener.nextChat {
                 if (it == "Y") {
                     transaction {
                         vault.delete()
                     }
-                    owner.sendLang("vaults-admin-delete-succeed")
+                    opener.sendLang("vaults-admin-delete-succeed")
                 } else {
-                    owner.sendLang("vaults-admin-delete-canceled")
+                    opener.sendLang("vaults-admin-delete-canceled")
                 }
                 sync {
-                    root?.open(event.clicker)
+                    root?.open()
                 }
             }
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 
     override fun title(): String {
-        return owner.asLangText("vaults-admin-title")
+        return opener.asLangText("vaults-admin-title")
     }
 
 }

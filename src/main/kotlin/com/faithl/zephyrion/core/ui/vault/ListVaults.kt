@@ -17,15 +17,16 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Linked
+import taboolib.module.ui.type.PageableChest
+import taboolib.module.ui.type.impl.PageableChestImpl
 import taboolib.platform.util.*
 
-class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = null) : SearchUI() {
+class ListVaults(override val opener: Player, val workspace: Workspace, val root: UI? = null) : SearchUI() {
 
     val vaults = mutableListOf<Vault>()
     val searchItems = mutableListOf<SearchItem>()
-    val params = mutableMapOf<String, String>()
-    val searchUI = Search(owner, searchItems, this)
+    override val params = mutableMapOf<String, String>()
+    val searchUI = Search(opener, searchItems, this)
 
     init {
         addSearchItems("name")
@@ -52,15 +53,15 @@ class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = nu
 
     fun addSearchItems(name: String) {
         searchItems += SearchItem(
-            owner.asLangText("vaults-main-search-by-${name}-name"),
-            owner.asLangText("vaults-main-search-by-${name}-desc")
+            opener.asLangText("vaults-main-search-by-${name}-name"),
+            opener.asLangText("vaults-main-search-by-${name}-desc")
         ) { player ->
-            owner.closeInventory()
-            owner.sendLang("vaults-main-search-by-${name}-input")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("vaults-main-search-by-${name}-input")
+            opener.nextChat {
                 params[name] = it
                 sync {
-                    searchUI.open(player)
+                    searchUI.open()
                 }
             }
         }
@@ -68,7 +69,7 @@ class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = nu
 
     override fun build(): Inventory {
         search()
-        return buildMenu<Linked<Vault>>(title()) {
+        return buildMenu<PageableChestImpl<Vault>>(title()) {
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
             setElements(this)
@@ -79,14 +80,15 @@ class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = nu
         }
     }
 
-    fun setElements(menu: Linked<Vault>) {
+    fun setElements(menu: PageableChest<Vault>) {
         menu.elements { vaults }
         menu.onGenerate { _, element, _, _ ->
             buildItem(XMaterial.CHEST) {
-                name = owner.asLangText("vaults-main-item-name", element.name)
+                name = opener.asLangText("vaults-main-item-name", element.name)
                 transaction {
-                    lore += if (element.workspace.owner == owner.uniqueId.toString()) {
-                        owner.asLangTextList(
+                    lore += if (element.workspace.owner == opener.uniqueId.toString() ||
+                        ZephyrionAPI.isPluginAdmin(opener)) {
+                        opener.asLangTextList(
                             "vaults-main-item-admin-desc",
                             element.id,
                             element.desc ?: "",
@@ -94,7 +96,7 @@ class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = nu
                             element.getUpdatedAt()
                         )
                     } else {
-                        owner.asLangTextList(
+                        opener.asLangTextList(
                             "vaults-main-item-member-desc",
                             element.id,
                             element.desc ?: "",
@@ -107,89 +109,92 @@ class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = nu
         }
         menu.onClick { event, element ->
             if (event.clickEvent().isLeftClick) {
-                VaultUI(owner, element, this@ListVaults).open(event.clicker)
+                VaultUI(event.clicker, element, this@ListVaults).open()
             } else if (event.clickEvent().isRightClick) {
                 transaction {
-                    if (element.workspace.owner == owner.uniqueId.toString()) {
-                        AdminVault(owner, element, this@ListVaults).open(event.clicker)
+                    if (element.workspace.owner == opener.uniqueId.toString() ||
+                        ZephyrionAPI.isPluginAdmin(opener)) {
+                        AdminVault(event.clicker, element, this@ListVaults).open()
                     }
                 }
             }
         }
     }
 
-    fun setCreateItem(menu: Linked<Vault>) {
-        if (workspace.owner == owner.uniqueId.toString() || (workspace.type == Workspaces.Type.INDEPENDENT && owner.hasPermission(
+    fun setCreateItem(menu: PageableChest<Vault>) {
+        if (workspace.owner == opener.uniqueId.toString() ||
+            ZephyrionAPI.isPluginAdmin(opener) ||
+            (workspace.type == Workspaces.Type.INDEPENDENT && opener.hasPermission(
                 Zephyrion.permissions.getString("create-independent-workspace")!!
             ))
         ) {
             menu.set(45) {
                 buildItem(XMaterial.STICK) {
-                    name = owner.asLangText("vaults-main-create")
+                    name = opener.asLangText("vaults-main-create")
                 }
             }
             menu.onClick(45) { event ->
                 if (event.currentItem != null) {
-                    CreateVault(owner, workspace, this).open(event.clicker)
+                    CreateVault(event.clicker, workspace, this).open()
                 }
             }
         }
     }
 
-    fun setPageTurnItems(menu: Linked<Vault>) {
+    fun setPageTurnItems(menu: PageableChest<Vault>) {
         menu.setPreviousPage(48) { _, hasPreviousPage ->
             if (hasPreviousPage) {
                 buildItem(XMaterial.ARROW) {
-                    name = owner.asLangText("vaults-main-prev-page")
+                    name = opener.asLangText("vaults-main-prev-page")
                 }
             } else {
                 buildItem(XMaterial.BARRIER) {
-                    name = owner.asLangText("vaults-main-prev-page-disabled")
+                    name = opener.asLangText("vaults-main-prev-page-disabled")
                 }
             }
         }
         menu.setNextPage(50) { _, hasNextPage ->
             if (hasNextPage) {
                 buildItem(XMaterial.ARROW) {
-                    name = owner.asLangText("vaults-main-next-page")
+                    name = opener.asLangText("vaults-main-next-page")
                 }
             } else {
                 buildItem(XMaterial.BARRIER) {
-                    name = owner.asLangText("vaults-main-next-page-disabled")
+                    name = opener.asLangText("vaults-main-next-page-disabled")
                 }
             }
         }
     }
 
-    fun setReturnItem(menu: Linked<Vault>) {
+    fun setReturnItem(menu: PageableChest<Vault>) {
         menu.set(53) {
             buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
                 name = if (root != null) {
-                    owner.asLangText("vaults-main-return")
+                    opener.asLangText("vaults-main-return")
                 } else {
-                    owner.asLangText("vaults-main-close")
+                    opener.asLangText("vaults-main-close")
                 }
             }
         }
         menu.onClick(53) {
-            owner.closeInventory()
-            root?.open(it.clicker)
+            it.clicker.closeInventory()
+            root?.open()
         }
     }
 
-    fun setSearchItem(menu: Linked<Vault>) {
+    fun setSearchItem(menu: PageableChest<Vault>) {
         menu.set(49) {
             buildItem(XMaterial.COMPASS) {
-                name = owner.asLangText("vaults-main-search")
+                name = opener.asLangText("vaults-main-search")
             }
         }
         menu.onClick(49) {
-            searchUI.open(it.clicker)
+            searchUI.open()
         }
     }
 
-    override fun open(opener: Player) {
-        if (owner != opener && !ZephyrionAPI.isPluginAdmin(opener) && !workspace.isMember(opener.uniqueId.toString())) {
+    override fun open() {
+        if (!ZephyrionAPI.isPluginAdmin(opener) && !workspace.isMember(opener.uniqueId.toString())) {
             return
         }
         opener.openInventory(build())
@@ -197,9 +202,9 @@ class ListVaults(val owner: Player, val workspace: Workspace, val root: UI? = nu
 
     override fun title(): String {
         return if (params.isNotEmpty()) {
-            owner.asLangText("vaults-main-title-with-search", workspace.name)
+            opener.asLangText("vaults-main-title-with-search", workspace.name)
         } else {
-            owner.asLangText("vaults-main-title", workspace.name)
+            opener.asLangText("vaults-main-title", workspace.name)
         }
     }
 

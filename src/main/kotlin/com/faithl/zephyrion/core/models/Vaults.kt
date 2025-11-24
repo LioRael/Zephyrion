@@ -36,7 +36,7 @@ class Vault(id: EntityID<Int>) : IntEntity(id) {
     fun addSize(add: Int): Boolean {
         val user = ZephyrionAPI.getUserData(workspace.owner)
         return transaction {
-            if (user.sizeUsed + add > user.sizeQuotas) {
+            if (!user.unlimited && user.sizeUsed + add > user.sizeQuotas) {
                 false
             } else {
                 user.sizeUsed += add

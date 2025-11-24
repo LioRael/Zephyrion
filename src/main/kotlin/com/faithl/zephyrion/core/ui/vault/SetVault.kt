@@ -11,16 +11,16 @@ import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.inventory.Inventory
 import taboolib.common.platform.event.SubscribeEvent
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Linked
+import taboolib.module.ui.type.impl.PageableChestImpl
 
-class SetVault(val vault: Vault, val owner: Player) : UI() {
+class SetVault(val vault: Vault, override val opener: Player) : UI() {
 
     fun addAutoPickup() {
         // TODO
     }
 
     override fun build(): Inventory {
-        return buildMenu<Linked<Setting>>(title()) {
+        return buildMenu<PageableChestImpl<Setting>>(title()) {
             elements {
                 Setting.find { Settings.vault eq vault.id }.toList()
             }
@@ -29,7 +29,7 @@ class SetVault(val vault: Vault, val owner: Player) : UI() {
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 

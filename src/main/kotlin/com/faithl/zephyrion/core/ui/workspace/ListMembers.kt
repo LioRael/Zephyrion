@@ -16,18 +16,19 @@ import org.bukkit.inventory.Inventory
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Linked
+import taboolib.module.ui.type.PageableChest
+import taboolib.module.ui.type.impl.PageableChestImpl
 import taboolib.platform.util.asLangText
 import taboolib.platform.util.buildItem
 import taboolib.platform.util.nextChat
 import taboolib.platform.util.sendLang
 
-class ListMembers(val owner: Player, val workspace: Workspace, val root: UI) : SearchUI() {
+class ListMembers(override val opener: Player, val workspace: Workspace, val root: UI) : SearchUI() {
 
     val members = mutableListOf<OfflinePlayer>()
     val searchItems = mutableListOf<SearchItem>()
-    val params = mutableMapOf<String, String>()
-    val searchUI = Search(owner, searchItems, this)
+    override val params = mutableMapOf<String, String>()
+    val searchUI = Search(opener, searchItems, this)
 
     init {
         addSearchItems("name")
@@ -48,13 +49,13 @@ class ListMembers(val owner: Player, val workspace: Workspace, val root: UI) : S
     }
 
     fun sort() {
-        members.sortBy { it.uniqueId.toString() == owner.uniqueId.toString() }
+        members.sortBy { it.uniqueId.toString() == opener.uniqueId.toString() }
         members.sortBy { it.isOnline }
     }
 
     override fun build(): Inventory {
         search()
-        return buildMenu<Linked<OfflinePlayer>>(title()) {
+        return buildMenu<PageableChestImpl<OfflinePlayer>>(title()) {
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
             setElements(this)
@@ -65,144 +66,142 @@ class ListMembers(val owner: Player, val workspace: Workspace, val root: UI) : S
         }
     }
 
-    fun setElements(menu: Linked<OfflinePlayer>) {
+    fun setElements(menu: PageableChest<OfflinePlayer>) {
         menu.elements { members }
         menu.onGenerate { _, element, _, _ ->
             buildItem(XMaterial.PLAYER_HEAD) {
-                name = owner.asLangText("workspace-members-item-name", element.name!!)
+                name = opener.asLangText("workspace-members-item-name", element.name!!)
                 lore += if (element.isOnline) {
-                    owner.asLangText("workspace-members-item-lore-online")
+                    opener.asLangText("workspace-members-item-lore-online")
                 } else {
-                    owner.asLangText("workspace-members-item-lore-offline")
+                    opener.asLangText("workspace-members-item-lore-offline")
                 }
-                lore += owner.asLangText("workspace-members-item-lore-remove")
+                lore += opener.asLangText("workspace-members-item-lore-remove")
             }
         }
         menu.onClick { event, element ->
             if (event.clickEvent().isLeftClick) {
                 if (workspace.owner == element.uniqueId.toString()) {
-                    owner.sendLang("workspace-members-remove-owner")
+                    opener.sendLang("workspace-members-remove-opener")
                     return@onClick
                 }
                 val result = ZephyrionAPI.removeMember(workspace, element)
                 if (result) {
-                    owner.sendLang("workspace-members-remove-succeed")
+                    opener.sendLang("workspace-members-remove-succeed")
                 } else {
-                    owner.sendLang("workspace-members-remove-not-member")
+                    opener.sendLang("workspace-members-remove-not-member")
                 }
-                sync {
-                    open(event.clicker)
-                }
+                open()
             }
         }
     }
 
-    fun setPageTurnItems(menu: Linked<OfflinePlayer>) {
+    fun setPageTurnItems(menu: PageableChest<OfflinePlayer>) {
         menu.setPreviousPage(48) { _, hasPreviousPage ->
             if (hasPreviousPage) {
                 buildItem(XMaterial.ARROW) {
-                    name = owner.asLangText("workspace-members-prev-page")
+                    name = opener.asLangText("workspace-members-prev-page")
                 }
             } else {
                 buildItem(XMaterial.BARRIER) {
-                    name = owner.asLangText("workspace-members-prev-page-disabled")
+                    name = opener.asLangText("workspace-members-prev-page-disabled")
                 }
             }
         }
         menu.setNextPage(50) { _, hasNextPage ->
             if (hasNextPage) {
                 buildItem(XMaterial.ARROW) {
-                    name = owner.asLangText("workspace-members-next-page")
+                    name = opener.asLangText("workspace-members-next-page")
                 }
             } else {
                 buildItem(XMaterial.BARRIER) {
-                    name = owner.asLangText("workspace-members-next-page-disabled")
+                    name = opener.asLangText("workspace-members-next-page-disabled")
                 }
             }
         }
     }
 
-    fun setAddItem(menu: Linked<OfflinePlayer>) {
+    fun setAddItem(menu: PageableChest<OfflinePlayer>) {
         menu.set(45) {
             buildItem(XMaterial.STICK) {
-                name = owner.asLangText("workspace-members-add")
+                name = opener.asLangText("workspace-members-add")
             }
         }
         menu.onClick(45) { event ->
-            owner.closeInventory()
-            owner.sendLang("workspace-members-add-input")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-members-add-input")
+            opener.nextChat {
                 val target = Bukkit.getPlayer(it)
                 if (target == null) {
-                    owner.sendLang("workspace-members-add-offline")
+                    opener.sendLang("workspace-members-add-offline")
                     sync {
-                        open(event.clicker)
+                        open()
                     }
                     return@nextChat
                 }
                 val result = ZephyrionAPI.addMember(workspace, target)
                 if (result) {
-                    owner.sendLang("workspace-members-add-succeed")
+                    opener.sendLang("workspace-members-add-succeed")
                 } else {
-                    owner.sendLang("workspace-members-add-existed")
+                    opener.sendLang("workspace-members-add-existed")
                 }
                 sync {
-                    open(event.clicker)
+                    open()
                 }
             }
         }
     }
 
-    fun setReturnItem(menu: Linked<OfflinePlayer>) {
+    fun setReturnItem(menu: PageableChest<OfflinePlayer>) {
         menu.set(53) {
             buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = owner.asLangText("workspace-members-return")
+                name = opener.asLangText("workspace-members-return")
             }
         }
         menu.onClick(53) {
-            root.open(it.clicker)
+            root.open()
         }
     }
 
-    fun setSearchItem(menu: Linked<OfflinePlayer>) {
+    fun setSearchItem(menu: PageableChest<OfflinePlayer>) {
         menu.set(49) {
             buildItem(XMaterial.COMPASS) {
-                name = owner.asLangText("workspace-members-search")
+                name = opener.asLangText("workspace-members-search")
             }
         }
         menu.onClick(49) {
             val permission = Zephyrion.settings.getString("permissions.add-member")
-            if (permission != null && !owner.hasPermission(permission)) {
-                owner.sendLang("workspace-members-add-no-perm")
+            if (permission != null && !opener.hasPermission(permission)) {
+                opener.sendLang("workspace-members-add-no-perm")
                 return@onClick
             }
-            searchUI.open(it.clicker)
+            searchUI.open()
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 
     override fun title(): String {
         return if (params.isNotEmpty()) {
-            owner.asLangText("workspace-members-title-with-search")
+            opener.asLangText("workspace-members-title-with-search")
         } else {
-            owner.asLangText("workspace-members-title")
+            opener.asLangText("workspace-members-title")
         }
     }
 
     fun addSearchItems(name: String) {
         searchItems += SearchItem(
-            owner.asLangText("workspace-members-search-by-${name}-name"),
-            owner.asLangText("workspace-members-search-by-${name}-desc")
+            opener.asLangText("workspace-members-search-by-${name}-name"),
+            opener.asLangText("workspace-members-search-by-${name}-desc")
         ) { player ->
-            owner.closeInventory()
-            owner.sendLang("workspace-members-search-by-${name}-input")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-members-search-by-${name}-input")
+            opener.nextChat {
                 params[name] = it
                 sync {
-                    searchUI.open(player)
+                    searchUI.open()
                 }
             }
         }

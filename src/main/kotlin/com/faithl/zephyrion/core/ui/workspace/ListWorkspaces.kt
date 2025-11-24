@@ -15,15 +15,22 @@ import org.bukkit.inventory.ItemStack
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Linked
+import taboolib.module.ui.type.PageableChest
+import taboolib.module.ui.type.impl.PageableChestImpl
 import taboolib.platform.util.*
 
-class ListWorkspaces(val owner: Player) : SearchUI() {
+/**
+ * @param opener 打开UI的玩家（查看者）
+ * @param targetPlayer 目标玩家（被查看的玩家），为null时表示查看自己的工作空间
+ */
+class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = null) : SearchUI() {
+
+    val dataOwner: Player = targetPlayer ?: opener
 
     val workspaces = mutableListOf<Workspace>()
     val searchItems = mutableListOf<SearchItem>()
-    val params = mutableMapOf<String, String>()
-    val searchUI = Search(owner, searchItems, this)
+    override val params = mutableMapOf<String, String>()
+    val searchUI = Search(opener, searchItems, this)
 
     init {
         addSearchItems("name")
@@ -33,7 +40,7 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
 
     override fun search() {
         workspaces.clear()
-        workspaces.addAll(ZephyrionAPI.getJoinedWorkspaces(owner))
+        workspaces.addAll(ZephyrionAPI.getJoinedWorkspaces(dataOwner))
         ZephyrionAPI.getIndependentWorkspace()?.let {
             workspaces.add(it)
         }
@@ -59,12 +66,12 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
     }
 
     fun sort() {
-        workspaces.sortBy { it.owner == owner.uniqueId.toString() }
+        workspaces.sortBy { it.owner == dataOwner.uniqueId.toString() }
     }
 
     override fun build(): Inventory {
         search()
-        return buildMenu<Linked<Workspace>>(title()) {
+        return buildMenu<PageableChestImpl<Workspace>>(title()) {
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
             setElements(this)
@@ -75,10 +82,10 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
         }
     }
 
-    fun setElements(menu: Linked<Workspace>) {
+    fun setElements(menu: PageableChest<Workspace>) {
         menu.elements { workspaces }
         menu.onGenerate { _, element, _, _ ->
-            if (element.owner == owner.uniqueId.toString()) {
+            if (element.owner == dataOwner.uniqueId.toString()) {
                 adminItem(element)
             } else {
                 memberItem(element)
@@ -86,9 +93,9 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
         }
         menu.onClick { event, element ->
             if (event.clickEvent().isLeftClick) {
-                ListVaults(owner, element, this).open(event.clicker)
-            } else if (event.clickEvent().isRightClick && element.owner == owner.uniqueId.toString()) {
-                AdminWorkspace(owner, element, this).open(event.clicker)
+                ListVaults(event.clicker, element, this).open()
+            } else if (event.clickEvent().isRightClick && element.owner == dataOwner.uniqueId.toString()) {
+                AdminWorkspace(event.clicker, element, this).open()
             }
         }
     }
@@ -96,22 +103,22 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
     fun memberItem(workspace: Workspace): ItemStack {
         if (workspace.type == Workspaces.Type.INDEPENDENT) {
             return buildItem(XMaterial.BOOK) {
-                name = owner.asLangText("workspace-main-item-name", owner.asLangText("independent-workspace"))
-                lore += owner.asLangTextList(
+                name = opener.asLangText("workspace-main-item-name", opener.asLangText("independent-workspace"))
+                lore += opener.asLangTextList(
                     "workspace-main-item-member-desc",
                     workspace.id,
-                    owner.asLangText("independent-workspace-desc"),
-                    owner.name,
+                    opener.asLangText("independent-workspace-desc"),
+                    opener.name,
                     workspace.getCreatedAt(),
                     workspace.getUpdatedAt(),
                     workspace.type.toString(),
-                    "[${owner.name}]"
+                    "[${opener.name}]"
                 )
             }
         }
         return buildItem(XMaterial.BOOK) {
-            name = owner.asLangText("workspace-main-item-name", workspace.name)
-            lore += owner.asLangTextList(
+            name = opener.asLangText("workspace-main-item-name", workspace.name)
+            lore += opener.asLangTextList(
                 "workspace-main-item-member-desc",
                 workspace.id,
                 workspace.desc ?: "",
@@ -126,8 +133,8 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
 
     fun adminItem(workspace: Workspace): ItemStack {
         return buildItem(XMaterial.ENCHANTED_BOOK) {
-            name = owner.asLangText("workspace-main-item-name", workspace.name)
-            lore += owner.asLangTextList(
+            name = opener.asLangText("workspace-main-item-name", workspace.name)
+            lore += opener.asLangTextList(
                 "workspace-main-item-admin-desc",
                 workspace.id,
                 workspace.desc ?: "",
@@ -140,77 +147,81 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
         }
     }
 
-    fun setCreateItem(menu: Linked<Workspace>) {
+    fun setCreateItem(menu: PageableChest<Workspace>) {
+        if (targetPlayer != null) {
+            return
+        }
+
         menu.set(45) {
             buildItem(XMaterial.STICK) {
-                val user = ZephyrionAPI.getUserData(owner.uniqueId.toString())
-                name = owner.asLangText("workspace-main-create")
-                lore += owner.asLangTextList("workspace-main-create-desc", user.workspaceUsed, user.workspaceQuotas)
+                val user = ZephyrionAPI.getUserData(dataOwner.uniqueId.toString())
+                name = opener.asLangText("workspace-main-create")
+                lore += opener.asLangTextList("workspace-main-create-desc", user.workspaceUsed, user.workspaceQuotas)
             }
         }
         menu.onClick(45) {
-            CreateWorkspace(owner, this).open(it.clicker)
+            CreateWorkspace(it.clicker, this).open()
         }
     }
 
-    fun setCloseItem(menu: Linked<Workspace>) {
+    fun setCloseItem(menu: PageableChest<Workspace>) {
         menu.set(53) {
             buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = owner.asLangText("workspace-main-close")
+                name = opener.asLangText("workspace-main-close")
             }
         }
         menu.onClick(53) {
-            owner.closeInventory()
+            opener.closeInventory()
         }
     }
 
-    fun setPageTurnItems(menu: Linked<Workspace>) {
+    fun setPageTurnItems(menu: PageableChest<Workspace>) {
         menu.setPreviousPage(48) { _, hasPreviousPage ->
             if (hasPreviousPage) {
                 buildItem(XMaterial.ARROW) {
-                    name = owner.asLangText("workspace-main-prev-page")
+                    name = opener.asLangText("workspace-main-prev-page")
                 }
             } else {
                 buildItem(XMaterial.BARRIER) {
-                    name = owner.asLangText("workspace-main-prev-page-disabled")
+                    name = opener.asLangText("workspace-main-prev-page-disabled")
                 }
             }
         }
         menu.setNextPage(50) { _, hasNextPage ->
             if (hasNextPage) {
                 buildItem(XMaterial.ARROW) {
-                    name = owner.asLangText("workspace-main-next-page")
+                    name = opener.asLangText("workspace-main-next-page")
                 }
             } else {
                 buildItem(XMaterial.BARRIER) {
-                    name = owner.asLangText("workspace-main-next-page-disabled")
+                    name = opener.asLangText("workspace-main-next-page-disabled")
                 }
             }
         }
     }
 
-    fun setSearchItem(menu: Linked<Workspace>) {
+    fun setSearchItem(menu: PageableChest<Workspace>) {
         menu.set(49) {
             buildItem(XMaterial.COMPASS) {
-                name = owner.asLangText("workspace-main-search")
+                name = opener.asLangText("workspace-main-search")
             }
         }
         menu.onClick(49) {
-            searchUI.open(it.clicker)
+            searchUI.open()
         }
     }
 
     fun addSearchItems(name: String) {
         searchItems += SearchItem(
-            owner.asLangText("workspace-main-search-by-${name}-name"),
-            owner.asLangText("workspace-main-search-by-${name}-desc")
+            opener.asLangText("workspace-main-search-by-${name}-name"),
+            opener.asLangText("workspace-main-search-by-${name}-desc")
         ) { player ->
-            owner.closeInventory()
-            owner.sendLang("workspace-main-search-by-${name}-input")
-            owner.nextChat {
+            opener.closeInventory()
+            opener.sendLang("workspace-main-search-by-${name}-input")
+            opener.nextChat {
                 params[name] = it
                 sync {
-                    searchUI.open(player)
+                    searchUI.open()
                 }
             }
         }
@@ -218,14 +229,17 @@ class ListWorkspaces(val owner: Player) : SearchUI() {
 
     override fun title(): String {
         return if (params.isNotEmpty()) {
-            owner.asLangText("workspace-main-title-with-search")
+            opener.asLangText("workspace-main-title-with-search")
+        } else if (targetPlayer != null) {
+            opener.asLangText("workspace-main-title") + " - ${dataOwner.name}"
         } else {
-            owner.asLangText("workspace-main-title")
+            opener.asLangText("workspace-main-title")
         }
     }
 
-    override fun open(opener: Player) {
-        if (owner != opener && !ZephyrionAPI.isPluginAdmin(opener)) {
+    override fun open() {
+        if (targetPlayer != null && !ZephyrionAPI.isPluginAdmin(opener)) {
+            opener.sendLang("no-permission")
             return
         }
         opener.openInventory(build())

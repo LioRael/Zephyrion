@@ -6,20 +6,20 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
-import taboolib.module.ui.type.Linked
+import taboolib.module.ui.type.impl.PageableChestImpl
 import taboolib.platform.util.asLangText
 import taboolib.platform.util.buildItem
 
 data class SearchItem(val name: String, val description: String, val action: (clicker: Player) -> Unit)
 
-class Search(val owner: Player, val elements: List<SearchItem>, val root: SearchUI) : UI() {
+class Search(override val opener: Player, val elements: List<SearchItem>, val root: SearchUI) : UI() {
 
     override fun title(): String {
-        return owner.asLangText("search-title")
+        return opener.asLangText("search-title")
     }
 
     override fun build(): Inventory {
-        return buildMenu<Linked<SearchItem>>(title()) {
+        return buildMenu<PageableChestImpl<SearchItem>>(title()) {
             rows(4)
             elements {
                 elements
@@ -43,6 +43,38 @@ class Search(val owner: Player, val elements: List<SearchItem>, val root: Search
                     }
                 }
             }
+            set(27) {
+                if (root.params.isEmpty()) {
+                    buildItem(XMaterial.PAPER) {
+                        name = opener.asLangText("search-condition-empty")
+                    }
+                } else {
+                    buildItem(XMaterial.WRITABLE_BOOK) {
+                        name = opener.asLangText("search-condition-title")
+                        lore.clear()
+                        root.params.forEach { (key, value) ->
+                            lore += opener.asLangText("search-condition-item", key, value)
+                        }
+                    }
+                }
+            }
+            set(29) {
+                buildItem(XMaterial.BARRIER) {
+                    name = opener.asLangText("search-clear")
+                    if (root.params.isEmpty()) {
+                        lore += opener.asLangText("search-clear-disabled-desc")
+                    } else {
+                        lore += opener.asLangText("search-clear-desc")
+                    }
+                }
+            }
+            onClick(29) {
+                if (root.params.isNotEmpty()) {
+                    root.params.clear()
+                    root.search()
+                    root.open()
+                }
+            }
             onGenerate { _, element, _, _ ->
                 buildItem(XMaterial.PAPER) {
                     name = "§f${element.name}"
@@ -52,41 +84,41 @@ class Search(val owner: Player, val elements: List<SearchItem>, val root: Search
             setPreviousPage(21) { _, hasPreviousPage ->
                 if (hasPreviousPage) {
                     buildItem(XMaterial.ARROW) {
-                        name = owner.asLangText("search-prev-page")
+                        name = opener.asLangText("search-prev-page")
                     }
                 } else {
                     buildItem(XMaterial.BARRIER) {
-                        name = owner.asLangText("search-prev-page-disabled")
+                        name = opener.asLangText("search-prev-page-disabled")
                     }
                 }
             }
             setNextPage(23) { _, hasNextPage ->
                 if (hasNextPage) {
                     buildItem(XMaterial.ARROW) {
-                        name = owner.asLangText("search-next-page")
+                        name = opener.asLangText("search-next-page")
                     }
                 } else {
                     buildItem(XMaterial.BARRIER) {
-                        name = owner.asLangText("search-next-page-disabled")
+                        name = opener.asLangText("search-next-page-disabled")
                     }
                 }
             }
             set(31) {
                 buildItem(XMaterial.COMPASS) {
-                    name = owner.asLangText("search-confirm")
+                    name = opener.asLangText("search-confirm")
                 }
             }
             onClick(31) {
                 root.search()
-                root.open(it.clicker)
+                root.open()
             }
             set(35) {
                 buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                    name = owner.asLangText("search-return")
+                    name = opener.asLangText("search-return")
                 }
             }
             onClick(35) {
-                root.open(it.clicker)
+                root.open()
             }
             onClick { event, element ->
                 element.action(event.clicker)
@@ -94,7 +126,7 @@ class Search(val owner: Player, val elements: List<SearchItem>, val root: Search
         }
     }
 
-    override fun open(opener: Player) {
+    override fun open() {
         opener.openInventory(build())
     }
 }

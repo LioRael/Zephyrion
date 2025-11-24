@@ -83,8 +83,21 @@ class Item(id: EntityID<Int>) : IntEntity(id) {
 
         fun setItem(vault: Vault, page: Int, slot: Int, itemStack: ItemStack, player: Player? = null) {
             transaction {
-                val item =
-                    find { (Items.vault eq vault.id) and (Items.page eq page) and (Items.slot eq slot) }.firstOrNull()
+                val item = if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
+                    find {
+                        (Items.vault eq vault.id) and
+                        (Items.page eq page) and
+                        (Items.slot eq slot) and
+                        (Items.owner eq player!!.uniqueId.toString())
+                    }.firstOrNull()
+                } else {
+                    find {
+                        (Items.vault eq vault.id) and
+                        (Items.page eq page) and
+                        (Items.slot eq slot)
+                    }.firstOrNull()
+                }
+
                 if (item == null) {
                     new {
                         if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
@@ -102,18 +115,16 @@ class Item(id: EntityID<Int>) : IntEntity(id) {
         }
 
         fun removeItem(vault: Vault, page: Int, slot: Int, player: Player? = null) {
-            if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
-                transaction {
+            transaction {
+                if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
                     val item =
                         find { (Items.vault eq vault.id) and (Items.page eq page) and (Items.slot eq slot) and (Items.owner eq player!!.uniqueId.toString()) }.firstOrNull()
                     item?.delete()
+                } else {
+                    val item =
+                        find { (Items.vault eq vault.id) and (Items.page eq page) and (Items.slot eq slot) }.firstOrNull()
+                    item?.delete()
                 }
-                return
-            }
-            transaction {
-                val item =
-                    find { (Items.vault eq vault.id) and (Items.page eq page) and (Items.slot eq slot) }.firstOrNull()
-                item?.delete()
             }
         }
 
