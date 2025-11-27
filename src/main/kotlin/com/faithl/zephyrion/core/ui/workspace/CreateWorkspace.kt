@@ -2,7 +2,7 @@ package com.faithl.zephyrion.core.ui.workspace
 
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
-import com.faithl.zephyrion.core.models.Workspaces
+import com.faithl.zephyrion.core.models.WorkspaceType
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setSplitBlock
 import org.bukkit.entity.Player
@@ -25,7 +25,7 @@ class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
 
     var name: String? = null
     var description: String? = null
-    var type: Workspaces.Type? = null
+    var type: WorkspaceType? = null
 
     override fun build(): Inventory {
         return buildMenu<ChestImpl>(title()) {
@@ -42,30 +42,30 @@ class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
 
     class TypeUI(override val opener: Player, val root: CreateWorkspace) : UI() {
         override fun build(): Inventory {
-            return buildMenu<PageableChestImpl<Workspaces.Type>>(title()) {
+            return buildMenu<PageableChestImpl<WorkspaceType>>(title()) {
                 rows(1)
                 handLocked(true)
                 slots(listOf(0, 1, 2))
                 elements {
-                    Workspaces.Type.entries
+                    WorkspaceType.entries
                 }
                 onGenerate { player, element, _, _ ->
                     when (element) {
-                        Workspaces.Type.INDEPENDENT -> {
+                        WorkspaceType.INDEPENDENT -> {
                             buildItem(XMaterial.PAPER) {
                                 name = player.asLangText("independent-workspace")
                                 lore += player.asLangText("independent-workspace-desc")
                             }
                         }
 
-                        Workspaces.Type.PUBLIC -> {
+                        WorkspaceType.PUBLIC -> {
                             buildItem(XMaterial.PAPER) {
                                 name = player.asLangText("public-workspace")
                                 lore += player.asLangText("public-workspace-desc")
                             }
                         }
 
-                        Workspaces.Type.PRIVATE -> {
+                        WorkspaceType.PRIVATE -> {
                             buildItem(XMaterial.PAPER) {
                                 name = player.asLangText("private-workspace")
                                 lore += player.asLangText("private-workspace-desc")
@@ -76,7 +76,7 @@ class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
                 onClick { event, element ->
                     event.isCancelled = true
                     when (element) {
-                        Workspaces.Type.INDEPENDENT -> {
+                        WorkspaceType.INDEPENDENT -> {
                             if (opener.hasPermission(Zephyrion.permissions.getString("create-independent-workspace")!!)) {
                                 root.type = element
                                 root.open()
@@ -85,7 +85,7 @@ class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
                             }
                         }
 
-                        Workspaces.Type.PUBLIC -> {
+                        WorkspaceType.PUBLIC -> {
                             if (opener.hasPermission(Zephyrion.permissions.getString("create-public-workspace")!!)) {
                                 root.type = element
                                 root.open()
@@ -94,7 +94,7 @@ class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
                             }
                         }
 
-                        Workspaces.Type.PRIVATE -> {
+                        WorkspaceType.PRIVATE -> {
                             if (opener.hasPermission(Zephyrion.permissions.getString("create-private-workspace")!!)) {
                                 root.type = element
                                 root.open()

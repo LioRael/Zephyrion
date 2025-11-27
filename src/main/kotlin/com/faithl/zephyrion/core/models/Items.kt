@@ -1,137 +1,237 @@
 package com.faithl.zephyrion.core.models
 
+import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.util.io.BukkitObjectInputStream
 import org.bukkit.util.io.BukkitObjectOutputStream
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
+import taboolib.module.database.Table
 import taboolib.module.nms.getI18nName
+import taboolib.module.nms.getName
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-object Items : IntIdTable() {
-    val vault = reference("vault", Vaults)
-    val page = integer("page")
-    val owner = varchar("owner", 36).nullable()
-    val slot = integer("slot")
-    val itemStackSerialized = text("item_stack")
-}
+/**
+ * Item数据类
+ */
+data class Item(
+    var id: Int,
+    var vaultId: Int,
+    var page: Int,
+    var owner: String?,
+    var slot: Int,
+    var itemStackSerialized: String
+) {
 
-class Item(id: EntityID<Int>) : IntEntity(id) {
-
-    var owner by Items.owner
-    var vault by Vault referencedOn Items.vault
-    var page by Items.page
-    var slot by Items.slot
-    var itemStackSerialized by Items.itemStackSerialized
     var itemStack: ItemStack
         get() = fromByteArray(itemStackSerialized)
         set(value) {
             itemStackSerialized = toBase64(value)
         }
 
-    fun getName(): String {
-        return itemStack.itemMeta?.displayName ?: itemStack.getI18nName()
+    companion object {
+
+        private val table: Table<*, *>
+            get() = DatabaseConfig.itemsTable
+
+        private val dataSource
+            get() = DatabaseConfig.dataSource
+
+        /**
+         * 根据名称搜索物品
+         */
+        fun searchItemsByName(vault: Vault, name: String): List<Item> {
+            return table.select(dataSource) {
+                where { "vault_id" eq vault.id }
+            }.map {
+                Item(
+                    id = getInt("id"),
+                    vaultId = getInt("vault_id"),
+                    page = getInt("page"),
+                    owner = getString("owner"),
+                    slot = getInt("slot"),
+                    itemStackSerialized = getString("item_stack")
+                )
+            }.filter { it.getName().contains(name,true) }
+        }
+
+        /**
+         * 根据Lore搜索物品
+         */
+        fun searchItemsByLore(vault: Vault, lore: String): List<Item> {
+            return table.select(dataSource) {
+                where { "vault_id" eq vault.id }
+            }.map {
+                Item(
+                    id = getInt("id"),
+                    vaultId = getInt("vault_id"),
+                    page = getInt("page"),
+                    owner = getString("owner"),
+                    slot = getInt("slot"),
+                    itemStackSerialized = getString("item_stack")
+                )
+            }.filter { it.getLore().any { it.contains(lore,true) } }
+        }
+
+        /**
+         * 获取指定页的物品
+         */
+        fun getItems(vault: Vault, page: Int, player: Player): List<Item> {
+            return if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+                table.select(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "owner" eq player.uniqueId.toString() }
+                    }
+                }.map {
+                    Item(
+                        id = getInt("id"),
+                        vaultId = getInt("vault_id"),
+                        page = getInt("page"),
+                        owner = getString("owner"),
+                        slot = getInt("slot"),
+                        itemStackSerialized = getString("item_stack")
+                    )
+                }
+            } else {
+                table.select(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                    }
+                }.map {
+                    Item(
+                        id = getInt("id"),
+                        vaultId = getInt("vault_id"),
+                        page = getInt("page"),
+                        owner = getString("owner"),
+                        slot = getInt("slot"),
+                        itemStackSerialized = getString("item_stack")
+                    )
+                }
+            }
+        }
+
+        /**
+         * 设置物品
+         */
+        fun setItem(vault: Vault, page: Int, slot: Int, itemStack: ItemStack, player: Player? = null) {
+            val existing = if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+                table.select(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                        and { "owner" eq player!!.uniqueId.toString() }
+                    }
+                }.find()
+            } else {
+                table.select(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                    }
+                }.find()
+            }
+
+            val itemBase64 = itemStack.toBase64()
+
+            if (!existing) {
+                // 插入新记录
+                table.insert(dataSource, "vault_id", "page", "owner", "slot", "item_stack") {
+                    value(
+                        vault.id,
+                        page,
+                        if (vault.workspace.type == WorkspaceType.INDEPENDENT) player!!.uniqueId.toString() else null,
+                        slot,
+                        itemBase64
+                    )
+                }
+            } else {
+                // 更新现有记录
+                table.update(dataSource) {
+                    set("item_stack", itemBase64)
+                    where {
+                        "vault_id" eq vault.id
+                        "page" eq page
+                        "slot" eq slot
+                        if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+                            and { "owner" eq player!!.uniqueId.toString() }
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * 删除物品
+         */
+        fun removeItem(vault: Vault, page: Int, slot: Int, player: Player? = null) {
+            if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+                table.delete(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                        and { "owner" eq player!!.uniqueId.toString() }
+                    }
+                }
+            } else {
+                table.delete(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                    }
+                }
+            }
+        }
+
+        private fun toBase64(itemStack: ItemStack): String {
+            return itemStack.toBase64()
+        }
+
+        private fun fromByteArray(base64: String): ItemStack {
+            return base64.base64ToItemStack()
+        }
     }
 
+    /**
+     * 获取关联的保险库
+     */
+    val vault: Vault
+        get() = Vault.findById(vaultId)
+            ?: error("Vault not found for item $id")
+
+    /**
+     * 获取物品名称
+     */
+    fun getName(): String {
+        return itemStack.getName()
+    }
+
+    /**
+     * 获取物品Lore
+     */
     fun getLore(): List<String> {
         return itemStack.itemMeta?.lore ?: listOf()
     }
 
-    companion object : IntEntityClass<Item>(Items) {
-
-        fun searchItemsByName(vault: Vault, name: String): List<Item> {
-            return transaction {
-                find { Items.vault eq vault.id }.filter {
-                    it.getName().contains(name, true)
-                }.toList()
-            }
-        }
-
-        fun searchItemsByLore(vault: Vault, lore: String): List<Item> {
-            return transaction {
-                find { Items.vault eq vault.id }.filter {
-                    it.getLore().contains(lore)
-                }.toList()
-            }
-        }
-
-        fun getItems(vault: Vault, page: Int, player: Player): List<Item> {
-            return transaction {
-                if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
-                    find { Items.vault eq vault.id and (Items.page eq page) and (Items.owner eq player.uniqueId.toString()) }.toList()
-                } else {
-                    find { Items.vault eq vault.id and (Items.page eq page) }.toList()
-                }
-            }
-        }
-
-        fun toBase64(itemStack: ItemStack): String {
-            return itemStack.toBase64()
-        }
-
-        fun fromByteArray(base64: String): ItemStack {
-            return base64.base64ToItemStack()
-        }
-
-        fun setItem(vault: Vault, page: Int, slot: Int, itemStack: ItemStack, player: Player? = null) {
-            transaction {
-                val item = if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
-                    find {
-                        (Items.vault eq vault.id) and
-                        (Items.page eq page) and
-                        (Items.slot eq slot) and
-                        (Items.owner eq player!!.uniqueId.toString())
-                    }.firstOrNull()
-                } else {
-                    find {
-                        (Items.vault eq vault.id) and
-                        (Items.page eq page) and
-                        (Items.slot eq slot)
-                    }.firstOrNull()
-                }
-
-                if (item == null) {
-                    new {
-                        if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
-                            this.owner = player!!.uniqueId.toString()
-                        }
-                        this.vault = vault
-                        this.page = page
-                        this.slot = slot
-                        this.itemStack = itemStack
-                    }
-                } else {
-                    item.itemStack = itemStack
-                }
-            }
-        }
-
-        fun removeItem(vault: Vault, page: Int, slot: Int, player: Player? = null) {
-            transaction {
-                if (vault.workspace.type == Workspaces.Type.INDEPENDENT) {
-                    val item =
-                        find { (Items.vault eq vault.id) and (Items.page eq page) and (Items.slot eq slot) and (Items.owner eq player!!.uniqueId.toString()) }.firstOrNull()
-                    item?.delete()
-                } else {
-                    val item =
-                        find { (Items.vault eq vault.id) and (Items.page eq page) and (Items.slot eq slot) }.firstOrNull()
-                    item?.delete()
-                }
-            }
-        }
-
+    /**
+     * 移除Minecraft颜色代码
+     */
+    private fun stripColorCodes(text: String): String {
+        return text.replace("§[0-9a-fk-or]".toRegex(), "")
     }
-
 }
 
+/**
+ * ItemStack序列化扩展函数
+ */
 @OptIn(ExperimentalEncodingApi::class)
 fun ItemStack.toBase64(): String {
     ByteArrayOutputStream().use { byteArrayOutputStream ->
@@ -142,6 +242,9 @@ fun ItemStack.toBase64(): String {
     }
 }
 
+/**
+ * Base64反序列化为ItemStack
+ */
 @OptIn(ExperimentalEncodingApi::class)
 fun String.base64ToItemStack(): ItemStack {
     ByteArrayInputStream(Base64.decode(this)).use { byteArrayInputStream ->

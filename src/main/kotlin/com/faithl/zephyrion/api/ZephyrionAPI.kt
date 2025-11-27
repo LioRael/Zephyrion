@@ -2,19 +2,18 @@ package com.faithl.zephyrion.api
 
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.core.models.*
+import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
-import org.jetbrains.exposed.sql.transactions.transaction
+import taboolib.common.platform.function.submitAsync
 
 object ZephyrionAPI {
 
     class Result(val success: Boolean, val reason: String? = null)
 
     fun getUserData(playerUniqueId: String): Quota {
-        return transaction {
-            Quota.getUser(playerUniqueId)
-        }
+        return Quota.getUser(playerUniqueId)
     }
 
     fun addSize(vault: Vault, size: Int): Boolean {
@@ -72,11 +71,7 @@ object ZephyrionAPI {
     }
 
     // 创建工作空间
-    fun createWorkspace(owner: String, name: String?, type: Workspaces.Type?, desc: String?): Result {
-        val ownerData = getUserData(owner)
-        if (ownerData.workspaceUsed + 1 > ownerData.workspaceQuotas) {
-            return Result(false, "workspace_quota_exceeded")
-        }
+    fun createWorkspace(owner: String, name: String?, type: WorkspaceType?, desc: String?): Result {
         val result = validateWorkspaceName(name, owner)
         if (!result.success) {
             return result
@@ -84,18 +79,44 @@ object ZephyrionAPI {
         if (type == null) {
             return Result(false, "workspace_type_invalid")
         }
-        transaction {
-            Workspace.new {
-                this.name = name!!
-                this.desc = desc
-                this.type = type
-                this.owner = owner
-                this.members = owner
-                this.createdAt = System.currentTimeMillis()
-                this.updatedAt = System.currentTimeMillis()
-            }
-            getUserData(owner).workspaceUsed += 1
+
+        val quotasTable = DatabaseConfig.quotasTable
+        val dataSource = DatabaseConfig.dataSource
+
+        val ownerData = getUserData(owner)
+        val newUsed = ownerData.workspaceUsed + 1
+
+        if (newUsed > ownerData.workspaceQuotas) {
+            return Result(false, "workspace_quota_exceeded")
         }
+
+        val affected = quotasTable.update(dataSource) {
+            set("workspace_used", newUsed)
+            where {
+                "player" eq owner
+                and { "workspace_used" eq ownerData.workspaceUsed }
+            }
+        }
+
+        if (affected == 0) {
+            return Result(false, "workspace_quota_exceeded")
+        }
+
+        submitAsync {
+            val table = DatabaseConfig.workspacesTable
+            table.insert(dataSource, "name", "description", "type", "owner", "members", "created_at", "updated_at") {
+                value(
+                    name!!,
+                    desc,
+                    type.name,
+                    owner,
+                    owner,
+                    System.currentTimeMillis(),
+                    System.currentTimeMillis()
+                )
+            }
+        }
+
         return Result(true)
     }
 
@@ -135,16 +156,22 @@ object ZephyrionAPI {
         if (!result.success) {
             return result
         }
-        transaction {
-            Vault.new {
-                this.name = name!!
-                this.desc = desc
-                this.workspace = workspace
-                this.size = 0
-                this.createdAt = System.currentTimeMillis()
-                this.updatedAt = System.currentTimeMillis()
+        val table = DatabaseConfig.vaultsTable
+        val dataSource = DatabaseConfig.dataSource
+
+        submitAsync {
+            table.insert(dataSource, "name", "description", "workspace_id", "size", "created_at", "updated_at") {
+                value(
+                    name!!,
+                    desc,
+                    workspace.id,
+                    0,
+                    System.currentTimeMillis(),
+                    System.currentTimeMillis()
+                )
             }
         }
+
         return Result(true)
     }
 
@@ -169,14 +196,17 @@ object ZephyrionAPI {
     }
 
     fun newSetting(vault: Vault, setting: String, value: String) {
-        return transaction {
-            Setting.new {
-                this.setting = Settings.SettingType.valueOf(setting)
-                this.value = value
-                this.vault = vault
-                this.createdAt = System.currentTimeMillis()
-                this.updatedAt = System.currentTimeMillis()
-            }
+        val table = DatabaseConfig.settingsTable
+        val dataSource = DatabaseConfig.dataSource
+
+        table.insert(dataSource, "setting", "value", "vault_id", "created_at", "updated_at") {
+            value(
+                setting,
+                value,
+                vault.id,
+                System.currentTimeMillis(),
+                System.currentTimeMillis()
+            )
         }
     }
 
@@ -254,14 +284,14 @@ object ZephyrionAPI {
     /**
      * 获取保险库的指定类型的自动拾取规则
      */
-    fun getAutoPickupsByType(vault: Vault, type: AutoPickups.Type): List<AutoPickup> {
+    fun getAutoPickupsByType(vault: Vault, type: AutoPickupType): List<AutoPickup> {
         return AutoPickup.getAutoPickupsByType(vault, type)
     }
 
     /**
      * 创建自动拾取规则
      */
-    fun createAutoPickup(vault: Vault, type: AutoPickups.Type, value: String): Result {
+    fun createAutoPickup(vault: Vault, type: AutoPickupType, value: String): Result {
         val result = AutoPickup.createAutoPickup(vault, type, value)
         if (result.success) {
             com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()

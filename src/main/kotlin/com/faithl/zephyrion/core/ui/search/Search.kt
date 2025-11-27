@@ -2,6 +2,7 @@ package com.faithl.zephyrion.core.ui.search
 
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.UI
+import com.faithl.zephyrion.core.ui.vault.VaultUI
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.library.xseries.XMaterial
@@ -71,8 +72,13 @@ class Search(override val opener: Player, val elements: List<SearchItem>, val ro
             onClick(29) {
                 if (root.params.isNotEmpty()) {
                     root.params.clear()
-                    root.search()
-                    root.open()
+                    // 清除搜索条件：创建新的VaultUI实例（page=1）
+                    val vaultUI = root as? VaultUI
+                    if (vaultUI != null) {
+                        VaultUI(opener, vaultUI.vault, vaultUI.root).open()
+                    } else {
+                        root.open()
+                    }
                 }
             }
             onGenerate { _, element, _, _ ->
@@ -109,8 +115,15 @@ class Search(override val opener: Player, val elements: List<SearchItem>, val ro
                 }
             }
             onClick(31) {
-                root.search()
-                root.open()
+                // 确认搜索：创建新的VaultUI实例（page=1）并传递搜索参数
+                val vaultUI = root as? VaultUI
+                if (vaultUI != null) {
+                    val newUI = VaultUI(opener, vaultUI.vault, vaultUI.root)
+                    newUI.params.putAll(vaultUI.params)
+                    newUI.open()
+                } else {
+                    root.open()
+                }
             }
             set(35) {
                 buildItem(XMaterial.RED_STAINED_GLASS_PANE) {

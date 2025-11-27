@@ -28,7 +28,7 @@ object Zephyrion : Plugin() {
         private set
 
     override fun onEnable() {
-        DatabaseConfig.connectToDatabase()
+        DatabaseConfig.initialize()
         console().sendLang("plugin-enabled")
     }
 

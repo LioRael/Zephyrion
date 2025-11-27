@@ -4,6 +4,7 @@ plugin-reload: "&b[Zephyrion] &cZephyrion has been reloaded!"
 no-permission: "&b[Zephyrion] &cYou do not have permission to use this command!"
 no-console: "&b[Zephyrion] &cThis command cannot be used in console!"
 no-player: "&b[Zephyrion] &cYou must be a player to use this command!"
+ui-load-error: "&b[Zephyrion] &cFailed to load UI, please try again later!"
 
 independent-workspace: "Independent Workspace"
 independent-workspace-desc: "Independent workspace will exist in the workspace list of each player, and the items in the internal warehouse are independent of each other"

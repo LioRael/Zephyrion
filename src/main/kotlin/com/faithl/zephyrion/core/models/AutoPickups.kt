@@ -1,114 +1,126 @@
 package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.api.ZephyrionAPI
+import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.inventory.ItemStack
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
+import taboolib.module.database.Table
 import taboolib.module.nms.getName
 
-object AutoPickups : IntIdTable() {
-
-    val type = enumerationByName("setting", 255, Type::class)
-    val value = varchar("value", 255)
-    val vault = reference("vault", Vaults)
-    val createdAt = long("created_at")
-    val updatedAt = long("updated_at")
-
-    enum class Type {
-        ITEM_PICKUP,
-        ITEM_NOT_PICKUP,
-    }
-
+/**
+ * 自动拾取类型枚举
+ */
+enum class AutoPickupType {
+    ITEM_PICKUP,
+    ITEM_NOT_PICKUP,
 }
 
-class AutoPickup(id: EntityID<Int>) : IntEntity(id) {
+/**
+ * AutoPickup数据类
+ */
+data class AutoPickup(
+    var id: Int,
+    var type: AutoPickupType,
+    var value: String,
+    var vaultId: Int,
+    var createdAt: Long,
+    var updatedAt: Long
+) {
 
-    companion object : IntEntityClass<AutoPickup>(AutoPickups) {
+    companion object {
+
+        private val table: Table<*, *>
+            get() = DatabaseConfig.autoPickupsTable
+
+        private val dataSource
+            get() = DatabaseConfig.dataSource
 
         /**
          * 获取保险库的所有自动拾取规则
-         * @param vault 保险库
-         * @return 自动拾取规则列表
          */
         fun getAutoPickups(vault: Vault): List<AutoPickup> {
-            return transaction {
-                find { AutoPickups.vault eq vault.id }.toList()
+            return table.select(dataSource) {
+                where { "vault_id" eq vault.id }
+            }.map {
+                AutoPickup(
+                    id = getInt("id"),
+                    type = AutoPickupType.valueOf(getString("type")),
+                    value = getString("value"),
+                    vaultId = getInt("vault_id"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
             }
         }
 
         /**
          * 获取保险库的指定类型的自动拾取规则
-         * @param vault 保险库
-         * @param type 规则类型
-         * @return 自动拾取规则列表
          */
-        fun getAutoPickupsByType(vault: Vault, type: AutoPickups.Type): List<AutoPickup> {
-            return transaction {
-                find {
-                    (AutoPickups.vault eq vault.id) and (AutoPickups.type eq type)
-                }.toList()
+        fun getAutoPickupsByType(vault: Vault, type: AutoPickupType): List<AutoPickup> {
+            return table.select(dataSource) {
+                where {
+                    "vault_id" eq vault.id
+                    and { "type" eq type.name }
+                }
+            }.map {
+                AutoPickup(
+                    id = getInt("id"),
+                    type = AutoPickupType.valueOf(getString("type")),
+                    value = getString("value"),
+                    vaultId = getInt("vault_id"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
             }
         }
 
         /**
          * 创建自动拾取规则
-         * @param vault 保险库
-         * @param type 规则类型
-         * @param value 匹配值（物品名称、类型等）
-         * @return 创建结果
          */
-        fun createAutoPickup(vault: Vault, type: AutoPickups.Type, value: String): ZephyrionAPI.Result {
+        fun createAutoPickup(vault: Vault, type: AutoPickupType, value: String): ZephyrionAPI.Result {
             if (value.isBlank()) {
                 return ZephyrionAPI.Result(false, "auto_pickup_value_empty")
             }
 
-            val existing = transaction {
-                find {
-                    (AutoPickups.vault eq vault.id) and
-                    (AutoPickups.type eq type) and
-                    (AutoPickups.value eq value)
-                }.firstOrNull()
-            }
+            val existing = table.select(dataSource) {
+                where {
+                    "vault_id" eq vault.id
+                    and { "type" eq type.name }
+                    and { "value" eq value }
+                }
+            }.find()
 
-            if (existing != null) {
+            if (existing) {
                 return ZephyrionAPI.Result(false, "auto_pickup_already_exists")
             }
 
-            transaction {
-                new {
-                    this.vault = vault
-                    this.type = type
-                    this.value = value
-                    this.createdAt = System.currentTimeMillis()
-                    this.updatedAt = System.currentTimeMillis()
-                }
+            table.insert(dataSource, "type", "value", "vault_id", "created_at", "updated_at") {
+                value(
+                    type.name,
+                    value,
+                    vault.id,
+                    System.currentTimeMillis(),
+                    System.currentTimeMillis()
+                )
             }
             return ZephyrionAPI.Result(true)
         }
 
         /**
          * 删除保险库的所有自动拾取规则
-         * @param vault 保险库
-         * @return 删除的数量
          */
         fun clearAutoPickups(vault: Vault): Int {
-            return transaction {
-                val rules = find { AutoPickups.vault eq vault.id }.toList()
-                val count = rules.size
-                rules.forEach { it.delete() }
-                count
+            val rules = getAutoPickups(vault)
+            val count = rules.size
+
+            table.delete(dataSource) {
+                where { "vault_id" eq vault.id }
             }
+
+            return count
         }
 
         /**
          * 检查物品是否匹配自动拾取规则
-         * @param itemStack 物品
-         * @param vault 保险库
-         * @return 是否应该自动拾取（true: 拾取, false: 不拾取, null: 无规则）
          */
         fun shouldAutoPickup(itemStack: ItemStack, vault: Vault): Boolean? {
             val rules = getAutoPickups(vault)
@@ -118,14 +130,14 @@ class AutoPickup(id: EntityID<Int>) : IntEntity(id) {
             val itemName = itemStack.getName()
             val itemLore = itemStack.itemMeta?.lore ?: emptyList()
 
-            val notPickupRules = rules.filter { it.type == AutoPickups.Type.ITEM_NOT_PICKUP }
+            val notPickupRules = rules.filter { it.type == AutoPickupType.ITEM_NOT_PICKUP }
             for (rule in notPickupRules) {
                 if (matchesRule(itemMaterial, itemName, itemLore, rule.value)) {
                     return false
                 }
             }
 
-            val pickupRules = rules.filter { it.type == AutoPickups.Type.ITEM_PICKUP }
+            val pickupRules = rules.filter { it.type == AutoPickupType.ITEM_PICKUP }
             for (rule in pickupRules) {
                 if (matchesRule(itemMaterial, itemName, itemLore, rule.value)) {
                     return true
@@ -143,14 +155,13 @@ class AutoPickup(id: EntityID<Int>) : IntEntity(id) {
          * - regex:.*钻石.* - 正则表达式匹配名称
          * - regex-lore:.*传说.* - 正则表达式匹配 lore
          * - 直接文字 - 默认匹配物品名称（包含）
-         *
-         * @param itemMaterial 物品材料类型
-         * @param itemName 物品名称
-         * @param itemLore 物品 lore 列表
-         * @param ruleValue 规则值
-         * @return 是否匹配
          */
-        private fun matchesRule(itemMaterial: String, itemName: String, itemLore: List<String>, ruleValue: String): Boolean {
+        private fun matchesRule(
+            itemMaterial: String,
+            itemName: String,
+            itemLore: List<String>,
+            ruleValue: String
+        ): Boolean {
             return when {
                 ruleValue.startsWith("type:", ignoreCase = true) -> {
                     val material = ruleValue.substring(5)
@@ -194,38 +205,40 @@ class AutoPickup(id: EntityID<Int>) : IntEntity(id) {
         }
     }
 
-    var type by AutoPickups.type
-    var value by AutoPickups.value
-    var vault by Vault referencedOn AutoPickups.vault
-    var createdAt by AutoPickups.createdAt
-    var updatedAt by AutoPickups.updatedAt
+    /**
+     * 获取关联的保险库
+     */
+    val vault: Vault
+        get() = Vault.findById(vaultId)
+            ?: error("Vault not found for auto pickup $id")
 
     /**
      * 删除自动拾取规则
-     * @return 是否成功
      */
     fun deleteRule(): Boolean {
-        return transaction {
-            this@AutoPickup.delete()
-            true
+        table.delete(dataSource) {
+            where { "id" eq id }
         }
+        return true
     }
 
     /**
      * 更新自动拾取规则的值
-     * @param newValue 新的匹配值
-     * @return 是否成功
      */
     fun updateValue(newValue: String): ZephyrionAPI.Result {
         if (newValue.isBlank()) {
             return ZephyrionAPI.Result(false, "auto_pickup_value_empty")
         }
 
-        transaction {
-            this@AutoPickup.value = newValue
-            this@AutoPickup.updatedAt = System.currentTimeMillis()
+        value = newValue
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("value", value)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
         }
+
         return ZephyrionAPI.Result(true)
     }
-
 }

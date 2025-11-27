@@ -1,99 +1,217 @@
 package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.api.ZephyrionAPI
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
+import com.faithl.zephyrion.storage.DatabaseConfig
+import taboolib.module.database.Table
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.ceil
 
-object Vaults : IntIdTable() {
-    val name = varchar("name", 255)
-    val desc = varchar("description", 255).nullable()
-    val workspace = reference("workspace", Workspaces)
-    val size = integer("size")
-    val createdAt = long("created_at")
-    val updatedAt = long("updated_at")
-}
+/**
+ * Vault数据类
+ */
+data class Vault(
+    var id: Int,
+    var name: String,
+    var desc: String?,
+    var workspaceId: Int,
+    var size: Int,
+    var createdAt: Long,
+    var updatedAt: Long
+) {
 
-class Vault(id: EntityID<Int>) : IntEntity(id) {
+    companion object {
 
-    companion object : IntEntityClass<Vault>(Vaults) {
+        private val table: Table<*, *>
+            get() = DatabaseConfig.vaultsTable
 
+        private val dataSource
+            get() = DatabaseConfig.dataSource
+
+        /**
+         * 根据ID获取保险库
+         */
+        fun findById(id: Int): Vault? {
+            return table.select(dataSource) {
+                where { "id" eq id }
+            }.firstOrNull {
+                Vault(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    workspaceId = getInt("workspace_id"),
+                    size = getInt("size"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
+            }
+        }
+
+        /**
+         * 获取指定工作空间和名称的保险库
+         */
         fun getVault(workspace: Workspace, name: String): Vault? {
-            return transaction { find { (Vaults.name eq name) and (Vaults.workspace eq workspace.id) }.firstOrNull() }
+            return table.select(dataSource) {
+                where {
+                    "name" eq name
+                    and { "workspace_id" eq workspace.id }
+                }
+            }.firstOrNull {
+                Vault(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    workspaceId = getInt("workspace_id"),
+                    size = getInt("size"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
+            }
         }
 
+        /**
+         * 获取指定工作空间的所有保险库
+         */
         fun getVaults(workspace: Workspace): List<Vault> {
-            return transaction { find { Vaults.workspace eq workspace.id }.toList() }
+            return table.select(dataSource) {
+                where { "workspace_id" eq workspace.id }
+            }.map {
+                Vault(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    workspaceId = getInt("workspace_id"),
+                    size = getInt("size"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
+            }
         }
-
     }
 
+    /**
+     * 获取关联的工作空间
+     */
+    val workspace: Workspace
+        get() = Workspace.findById(workspaceId)
+            ?: error("Workspace not found for vault $id")
+
+    /**
+     * 增加容量
+     */
     fun addSize(add: Int): Boolean {
         val user = ZephyrionAPI.getUserData(workspace.owner)
-        return transaction {
-            if (!user.unlimited && user.sizeUsed + add > user.sizeQuotas) {
-                false
-            } else {
-                user.sizeUsed += add
-                size += add
-                updatedAt = System.currentTimeMillis()
-                true
+        val currentSizeUsed = user.sizeUsed
+        val newSizeUsed = currentSizeUsed + add
+
+        if (!user.unlimited && newSizeUsed > user.sizeQuotas) {
+            return false
+        }
+
+        val quotasTable = DatabaseConfig.quotasTable
+
+        val affected = quotasTable.update(dataSource) {
+            set("size_used", newSizeUsed)
+            where {
+                "player" eq workspace.owner
+                and { "size_used" eq currentSizeUsed }
             }
         }
+
+        if (affected == 0) {
+            return false
+        }
+
+        size += add
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("size", size)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
+        }
+
+        return true
     }
 
+    /**
+     * 减少容量
+     */
     fun removeSize(remove: Int): Boolean {
         val user = ZephyrionAPI.getUserData(workspace.owner)
-        return transaction {
-            if (user.sizeUsed - remove < 0) {
-                false
-            } else {
-                user.sizeUsed -= remove
-                size -= remove
-                updatedAt = System.currentTimeMillis()
-                true
+        val currentSizeUsed = user.sizeUsed
+        val newSizeUsed = currentSizeUsed - remove
+
+        if (newSizeUsed < 0) {
+            return false
+        }
+
+        val quotasTable = DatabaseConfig.quotasTable
+
+        val affected = quotasTable.update(dataSource) {
+            set("size_used", newSizeUsed)
+            where {
+                "player" eq workspace.owner
+                and { "size_used" eq currentSizeUsed }
             }
         }
+
+        if (affected == 0) {
+            return false
+        }
+
+        size -= remove
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("size", size)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
+        }
+
+        return true
     }
 
+    /**
+     * 获取创建时间(格式化)
+     */
     fun getCreatedAt(): String {
-        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(createdAt))
+        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(createdAt))
     }
 
+    /**
+     * 获取更新时间(格式化)
+     */
     fun getUpdatedAt(): String {
-        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(updatedAt))
+        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(updatedAt))
     }
 
+    /**
+     * 获取最大页数
+     */
     fun getMaxPage(): Int {
         val maxPage = ceil(size.toDouble() / 36).toInt()
-        return if (maxPage == 0) {
-            1
-        } else {
-            maxPage
-        }
+        return if (maxPage == 0) 1 else maxPage
     }
 
+    /**
+     * 重命名保险库
+     */
     fun rename(newName: String): ZephyrionAPI.Result {
         val result = ZephyrionAPI.validateVaultName(newName, workspace)
         if (!result.success) {
             return result
         }
-        return transaction {
-            name = newName
-            updatedAt = System.currentTimeMillis()
-            ZephyrionAPI.Result(true)
-        }
-    }
 
-    var name by Vaults.name
-    var desc by Vaults.desc
-    var workspace by Workspace referencedOn Vaults.workspace
-    var size by Vaults.size
-    var createdAt by Vaults.createdAt
-    var updatedAt by Vaults.updatedAt
+        name = newName
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("name", name)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
+        }
+
+        return ZephyrionAPI.Result(true)
+    }
 }

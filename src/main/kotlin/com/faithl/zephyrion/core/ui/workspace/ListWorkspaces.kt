@@ -2,7 +2,7 @@ package com.faithl.zephyrion.core.ui.workspace
 
 import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Workspace
-import com.faithl.zephyrion.core.models.Workspaces
+import com.faithl.zephyrion.core.models.WorkspaceType
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.search.Search
 import com.faithl.zephyrion.core.ui.search.SearchItem
@@ -12,6 +12,7 @@ import com.faithl.zephyrion.core.ui.vault.ListVaults
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
+import taboolib.common.platform.function.submitAsync
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -70,7 +71,6 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
     }
 
     override fun build(): Inventory {
-        search()
         return buildMenu<PageableChestImpl<Workspace>>(title()) {
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
@@ -101,7 +101,7 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
     }
 
     fun memberItem(workspace: Workspace): ItemStack {
-        if (workspace.type == Workspaces.Type.INDEPENDENT) {
+        if (workspace.type == WorkspaceType.INDEPENDENT) {
             return buildItem(XMaterial.BOOK) {
                 name = opener.asLangText("workspace-main-item-name", opener.asLangText("independent-workspace"))
                 lore += opener.asLangTextList(
@@ -242,7 +242,20 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
             opener.sendLang("no-permission")
             return
         }
-        opener.openInventory(build())
+
+        submitAsync {
+            try {
+                search()
+                sync {
+                    opener.openInventory(build())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                sync {
+                    opener.sendLang("ui-load-error")
+                }
+            }
+        }
     }
 
 }

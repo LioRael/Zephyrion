@@ -2,15 +2,15 @@ package com.faithl.zephyrion.core.services
 
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
-import com.faithl.zephyrion.core.models.*
 import com.faithl.zephyrion.core.models.AutoPickup
+import com.faithl.zephyrion.core.models.Item
+import com.faithl.zephyrion.core.models.Vault
+import com.faithl.zephyrion.core.models.WorkspaceType
 import org.bukkit.entity.Player
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.ItemStack
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
 import taboolib.common.platform.event.EventPriority
 import taboolib.common.platform.event.SubscribeEvent
 import taboolib.common.platform.function.submit
@@ -78,16 +78,14 @@ object AutoPickupService {
             return cached
         }
 
-        val vaults = transaction {
-            val workspaces = ZephyrionAPI.getJoinedWorkspaces(player)
-            val result = mutableListOf<Vault>()
+        val workspaces = ZephyrionAPI.getJoinedWorkspaces(player)
+        val result = mutableListOf<Vault>()
 
-            for (workspace in workspaces) {
-                result.addAll(ZephyrionAPI.getVaults(workspace))
-            }
-            result.filter { vault ->
-                AutoPickup.getAutoPickups(vault).isNotEmpty()
-            }
+        for (workspace in workspaces) {
+            result.addAll(ZephyrionAPI.getVaults(workspace))
+        }
+        val vaults = result.filter { vault ->
+            AutoPickup.getAutoPickups(vault).isNotEmpty()
         }
 
         playerVaultCache[playerId] = vaults
@@ -103,48 +101,63 @@ object AutoPickupService {
     }
 
     private fun storeItemInVault(vault: Vault, itemStack: ItemStack, player: Player): Boolean {
-        return transaction {
-            val vaultSize = vault.size
-            if (vaultSize <= 0) {
-                return@transaction false
+        val vaultSize = vault.size
+        if (vaultSize <= 0) {
+            return false
+        }
+
+        val maxPage = vault.getMaxPage()
+        val playerUuid = player.uniqueId.toString()
+        val isIndependent = vault.workspace.type == WorkspaceType.INDEPENDENT
+        val table = com.faithl.zephyrion.storage.DatabaseConfig.itemsTable
+        val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
+
+        val allExistingItems = if (isIndependent) {
+            table.select(dataSource) {
+                where {
+                    "vault_id" eq vault.id
+                    and { "owner" eq playerUuid }
+                }
+            }.map {
+                Item(
+                    id = getInt("id"),
+                    vaultId = getInt("vault_id"),
+                    page = getInt("page"),
+                    owner = getString("owner"),
+                    slot = getInt("slot"),
+                    itemStackSerialized = getString("item_stack")
+                )
             }
-
-            val maxPage = vault.getMaxPage()
-            val playerUuid = player.uniqueId.toString()
-            val isIndependent = vault.workspace.type == Workspaces.Type.INDEPENDENT
-
-            val allExistingItems = if (isIndependent) {
-                Item.find {
-                    (Items.vault eq vault.id) and (Items.owner eq playerUuid)
-                }.toList()
-            } else {
-                Item.find { Items.vault eq vault.id }.toList()
+        } else {
+            table.select(dataSource) {
+                where { "vault_id" eq vault.id }
+            }.map {
+                Item(
+                    id = getInt("id"),
+                    vaultId = getInt("vault_id"),
+                    page = getInt("page"),
+                    owner = getString("owner"),
+                    slot = getInt("slot"),
+                    itemStackSerialized = getString("item_stack")
+                )
             }
+        }
 
-            val usedSlotsByPage = allExistingItems.groupBy { it.page }
-                .mapValues { (_, items) -> items.map { it.slot }.toSet() }
+        val usedSlotsByPage = allExistingItems.groupBy { it.page }
+            .mapValues { (_, items) -> items.map { it.slot }.toSet() }
 
-            for (page in 1..maxPage) {
-                val slotsInPage = minOf(page * 36, vaultSize) - (page - 1) * 36
-                val usedSlots = usedSlotsByPage[page] ?: emptySet()
+        for (page in 1..maxPage) {
+            val slotsInPage = minOf(page * 36, vaultSize) - (page - 1) * 36
+            val usedSlots = usedSlotsByPage[page] ?: emptySet()
 
-                for (slot in 0 until slotsInPage) {
-                    if (slot !in usedSlots) {
-                        Item.new {
-                            this.vault = vault
-                            this.page = page
-                            this.slot = slot
-                            this.itemStack = itemStack
-                            if (isIndependent) {
-                                this.owner = playerUuid
-                            }
-                        }
-                        return@transaction true
-                    }
+            for (slot in 0 until slotsInPage) {
+                if (slot !in usedSlots) {
+                    Item.setItem(vault, page, slot, itemStack, player)
+                    return true
                 }
             }
-            false
         }
+        return false
     }
 
 }

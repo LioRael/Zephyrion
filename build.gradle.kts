@@ -21,17 +21,16 @@ taboolib {
             BukkitUI,
             BukkitUtil,
             CommandHelper,
+            Database,
+            DatabasePlayer,
             I18n,
             Kether,
             MinecraftChat,
             Metrics,
-
         )
-        enableIsolatedClassloader  = true
     }
     version {
         taboolib = "6.2.4-abd325ee"
-        skipKotlinRelocate = true
     }
     description{
         contributors {
@@ -53,10 +52,6 @@ dependencies {
     compileOnly("ink.ptms:nms-all:1.0.0")
 
     compileOnly("com.google.code.gson:gson:2.10")
-    compileOnly("com.zaxxer:HikariCP:5.0.1")
-    compileOnly("org.jetbrains.exposed:exposed-core:$exposedVersion")
-    compileOnly("org.jetbrains.exposed:exposed-dao:$exposedVersion")
-    compileOnly("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
 
     compileOnly(kotlin("stdlib"))
     compileOnly(fileTree("libs"))

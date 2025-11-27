@@ -13,6 +13,7 @@ import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
+import taboolib.common.platform.function.submitAsync
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -54,7 +55,6 @@ class ListMembers(override val opener: Player, val workspace: Workspace, val roo
     }
 
     override fun build(): Inventory {
-        search()
         return buildMenu<PageableChestImpl<OfflinePlayer>>(title()) {
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
@@ -180,7 +180,19 @@ class ListMembers(override val opener: Player, val workspace: Workspace, val roo
     }
 
     override fun open() {
-        opener.openInventory(build())
+        submitAsync {
+            try {
+                search()
+                sync {
+                    opener.openInventory(build())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                sync {
+                    opener.sendLang("ui-load-error")
+                }
+            }
+        }
     }
 
     override fun title(): String {

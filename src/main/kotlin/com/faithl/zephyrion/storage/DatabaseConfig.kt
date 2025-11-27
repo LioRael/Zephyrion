@@ -1,42 +1,105 @@
 package com.faithl.zephyrion.storage
 
 import com.faithl.zephyrion.Zephyrion
-import com.faithl.zephyrion.core.models.*
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
-import taboolib.common.env.RuntimeDependencies
-import taboolib.common.env.RuntimeDependency
+import taboolib.module.database.Host
+import taboolib.module.database.HostSQL
+import taboolib.module.database.HostSQLite
+import taboolib.module.database.Table
+import java.io.File
+import javax.sql.DataSource
 
-@RuntimeDependencies(
-    RuntimeDependency("org.jetbrains.exposed:exposed-core:0.41.1"),
-    RuntimeDependency("org.jetbrains.exposed:exposed-dao:0.41.1"),
-    RuntimeDependency("org.jetbrains.exposed:exposed-jdbc:0.41.1"),
-    RuntimeDependency("org.jetbrains.kotlin:kotlin-reflect:1.9.0"),
-)
 object DatabaseConfig {
 
-    fun connectToDatabase() {
+    lateinit var host: Host<*>
+        private set
+
+    val dataSource: DataSource by lazy {
+        host.createDataSource()
+    }
+
+    // 表列表 - 将在迁移过程中逐步添加
+    lateinit var workspacesTable: Table<*, *>
+    lateinit var vaultsTable: Table<*, *>
+    lateinit var itemsTable: Table<*, *>
+    lateinit var quotasTable: Table<*, *>
+    lateinit var settingsTable: Table<*, *>
+    lateinit var autoPickupsTable: Table<*, *>
+
+    fun initialize() {
+        connectToDatabase()
+        createTables()
+    }
+
+    private fun connectToDatabase() {
         val type = Zephyrion.settings.getString("database.type")
-        if (type != null) {
-            when (type.lowercase()) {
-                "sqlite" -> {
-                    SQLite.connect()
-                }
+            ?: error("database type is not set")
 
-                "mysql" -> {
-                    MySQL.connect()
-                }
-
-                else -> {
-                    error("unsupported database type: $type")
-                }
-            }
-            transaction {
-                SchemaUtils.create(Workspaces, Vaults, Items, Quotas, Settings, AutoPickups)
-            }
-        } else {
-            error("database type is not set")
+        host = when (type.lowercase()) {
+            "sqlite" -> createSQLiteHost()
+            "mysql" -> createMySQLHost()
+            else -> error("unsupported database type: $type")
         }
     }
 
+    private fun createSQLiteHost(): HostSQLite {
+        val dataFolder = Zephyrion.plugin.dataFolder
+        if (!dataFolder.exists()) {
+            dataFolder.mkdirs()
+        }
+        val dbFile = File(dataFolder, "zephyrion.db")
+        return HostSQLite(dbFile)
+    }
+
+    private fun createMySQLHost(): HostSQL {
+        val host = Zephyrion.settings.getString("database.host") ?: "localhost"
+        val port = Zephyrion.settings.getString("database.port") ?: "3306"
+        val database = Zephyrion.settings.getString("database.database") ?: "zephyrion"
+        val username = Zephyrion.settings.getString("database.username") ?: "root"
+        val password = Zephyrion.settings.getString("database.password") ?: ""
+
+        return HostSQL(
+            host = host,
+            port = port,
+            user = username,
+            password = password,
+            database = database
+        )
+    }
+
+    private fun createTables() {
+        // 创建 Quotas 表
+        quotasTable = QuotasTable.createTable(host)
+        quotasTable.createTable(dataSource)
+
+        // 创建 Workspaces 表
+        workspacesTable = WorkspacesTable.createTable(host)
+        workspacesTable.createTable(dataSource)
+
+        // 初始化公共工作空间
+        com.faithl.zephyrion.core.models.Workspace.initializeIndependentWorkspace()
+
+        // 创建 Vaults 表
+        vaultsTable = VaultsTable.createTable(host)
+        vaultsTable.createTable(dataSource)
+
+        // 创建 Items 表
+        itemsTable = ItemsTable.createTable(host)
+        itemsTable.createTable(dataSource)
+
+        // 创建 Settings 表
+        settingsTable = SettingsTable.createTable(host)
+        settingsTable.createTable(dataSource)
+
+        // 创建 AutoPickups 表
+        autoPickupsTable = AutoPickupsTable.createTable(host)
+        autoPickupsTable.createTable(dataSource)
+    }
+
+    /**
+     * 获取表名(支持前缀配置)
+     */
+    fun getTableName(name: String): String {
+        val prefix = Zephyrion.settings.getString("database.table-prefix") ?: ""
+        return prefix + name
+    }
 }

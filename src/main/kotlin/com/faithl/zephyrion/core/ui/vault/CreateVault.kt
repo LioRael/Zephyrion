@@ -50,10 +50,10 @@ class CreateVault(override val opener: Player, val workspace: Workspace, val roo
         menu.set('I') {
             buildItem(XMaterial.BOOK) {
                 name = opener.asLangText("vaults-create-item-info-name")
-                name?.let {
+                this@CreateVault.name?.let {
                     lore += opener.asLangText("vaults-create-item-info-lore-name", it)
                 }
-                name?.let {
+                this@CreateVault.description?.let {
                     lore += opener.asLangText("vaults-create-item-info-lore-desc", it)
                 }
             }

@@ -1,32 +1,40 @@
 package com.faithl.zephyrion.core.models
 
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
+import com.faithl.zephyrion.storage.DatabaseConfig
+import taboolib.module.database.Table
 
-object Settings : IntIdTable() {
-
-    val setting = enumerationByName("setting", 255, SettingType::class)
-    val value = varchar("value", 255)
-    val vault = reference("vault", Vaults)
-    val createdAt = long("created_at")
-    val updatedAt = long("updated_at")
-
-    enum class SettingType {
-
-    }
-
+/**
+ * 设置类型枚举
+ */
+enum class SettingType {
+    // 可在此处添加设置类型
 }
 
-class Setting(id: EntityID<Int>) : IntEntity(id) {
+/**
+ * Setting数据类
+ */
+data class Setting(
+    var id: Int,
+    var setting: String,
+    var value: String,
+    var vaultId: Int,
+    var createdAt: Long,
+    var updatedAt: Long
+) {
 
-    var setting by Settings.setting
-    var value by Settings.value
-    var vault by Vault referencedOn Settings.vault
-    var createdAt by Settings.createdAt
-    var updatedAt by Settings.updatedAt
+    companion object {
 
-    companion object : IntEntityClass<Setting>(Settings)
+        private val table: Table<*, *>
+            get() = DatabaseConfig.settingsTable
 
+        private val dataSource
+            get() = DatabaseConfig.dataSource
+    }
+
+    /**
+     * 获取关联的保险库
+     */
+    val vault: Vault
+        get() = Vault.findById(vaultId)
+            ?: error("Vault not found for setting $id")
 }

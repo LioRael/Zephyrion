@@ -2,155 +2,264 @@ package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
+import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
+import taboolib.module.database.Table
+import java.text.SimpleDateFormat
 import java.util.*
 
-object Workspaces : IntIdTable() {
-    val name = varchar("name", 255)
-    val desc = varchar("description", 255).nullable()
-    val type = enumerationByName("type", 255, Type::class)
-    val owner = varchar("owner", 255)
-    val members = varchar("members", 255)
-    val createdAt = long("created_at")
-    val updatedAt = long("updated_at")
 
-    enum class Type {
-        PUBLIC, PRIVATE,
-        INDEPENDENT
-    }
+enum class WorkspaceType {
+    PUBLIC, PRIVATE, INDEPENDENT
+}
 
-    init {
-        if (Zephyrion.settings.getBoolean("workspace.independent")) {
-            val independentWorkspace = Workspace.find { name eq "Independent" }.firstOrNull()
-            if (independentWorkspace == null) {
-                transaction {
-                    Workspace.new {
-                        name = "Independent"
-                        desc = "Independent workspace"
-                        owner = "Server"
-                        members = ""
-                        type = Type.INDEPENDENT
-                        createdAt = System.currentTimeMillis()
-                        updatedAt = System.currentTimeMillis()
-                    }
+data class Workspace(
+    var id: Int,
+    var name: String,
+    var desc: String?,
+    var type: WorkspaceType,
+    var owner: String,
+    var members: String,
+    var createdAt: Long,
+    var updatedAt: Long
+) {
+
+    companion object {
+
+        private val table: Table<*, *>
+            get() = DatabaseConfig.workspacesTable
+
+        private val dataSource
+            get() = DatabaseConfig.dataSource
+
+        fun initializeIndependentWorkspace() {
+            if (!Zephyrion.settings.getBoolean("workspace.independent")) {
+                return
+            }
+
+            val dataSource = DatabaseConfig.dataSource
+            val table = DatabaseConfig.workspacesTable
+
+            // 检查是否已存在
+            val exists = table.select(dataSource) {
+                where { "name" eq "Independent" }
+            }.find()
+
+            if (!exists) {
+                table.insert(dataSource, "name", "description", "type", "owner", "members", "created_at", "updated_at") {
+                    value(
+                        "Independent",
+                        "Independent workspace",
+                        "INDEPENDENT",
+                        "Server",
+                        "",
+                        System.currentTimeMillis(),
+                        System.currentTimeMillis()
+                    )
                 }
             }
         }
-    }
-}
 
-class Workspace(id: EntityID<Int>) : IntEntity(id) {
-
-    companion object : IntEntityClass<Workspace>(Workspaces) {
+        fun findById(id: Int): Workspace? {
+            return table.select(dataSource) {
+                where { "id" eq id }
+            }.firstOrNull {
+                Workspace(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    type = WorkspaceType.valueOf(getString("type")),
+                    owner = getString("owner"),
+                    members = getString("members"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
+            }
+        }
 
         fun getIndependentWorkspace(): Workspace? {
-            return transaction {
-                find { Workspaces.name eq "Independent" }.firstOrNull()
+            return table.select(dataSource) {
+                where { "name" eq "Independent" }
+            }.firstOrNull {
+                Workspace(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    type = WorkspaceType.valueOf(getString("type")),
+                    owner = getString("owner"),
+                    members = getString("members"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
             }
         }
 
         fun getJoinedWorkspaces(player: Player): List<Workspace> {
-            return transaction {
-                find { Workspaces.members like "%${player.uniqueId}%" }.toList()
+            val playerUUID = player.uniqueId.toString()
+            return table.select(dataSource) {
+                where { "members" like "%$playerUUID%" }
+            }.map {
+                Workspace(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    type = WorkspaceType.valueOf(getString("type")),
+                    owner = getString("owner"),
+                    members = getString("members"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
             }
         }
 
         fun getWorkspace(player: String, name: String): Workspace? {
-            return transaction {
-                find { (Workspaces.members like "%${player}%") and (Workspaces.name eq name) }.firstOrNull()
+            return table.select(dataSource) {
+                where {
+                    "members" like "%$player%"
+                    and { "name" eq name }
+                }
+            }.firstOrNull {
+                Workspace(
+                    id = getInt("id"),
+                    name = getString("name"),
+                    desc = getString("description"),
+                    type = WorkspaceType.valueOf(getString("type")),
+                    owner = getString("owner"),
+                    members = getString("members"),
+                    createdAt = getLong("created_at"),
+                    updatedAt = getLong("updated_at")
+                )
             }
         }
 
         fun addMember(workspace: Workspace, player: Player): Boolean {
-            return transaction {
-                if (workspace.members.contains(player.uniqueId.toString())) {
-                    false
-                } else {
-                    workspace.members = workspace.members + "," + player.uniqueId.toString()
-                    workspace.updatedAt = System.currentTimeMillis()
-                    true
-                }
+            if (workspace.members.contains(player.uniqueId.toString())) {
+                return false
             }
+
+            workspace.members = workspace.members + "," + player.uniqueId.toString()
+            workspace.updatedAt = System.currentTimeMillis()
+
+            table.update(dataSource) {
+                set("members", workspace.members)
+                set("updated_at", workspace.updatedAt)
+                where { "id" eq workspace.id }
+            }
+            return true
         }
 
         fun removeMember(workspace: Workspace, player: OfflinePlayer): Boolean {
-            return transaction {
-                if (workspace.owner == player.uniqueId.toString()) {
-                    false
-                } else if (workspace.members.contains(player.uniqueId.toString())) {
-                    workspace.members = workspace.members.replace("," + player.uniqueId.toString(), "")
-                    workspace.updatedAt = System.currentTimeMillis()
-                    true
-                } else {
-                    false
-                }
+            if (workspace.owner == player.uniqueId.toString()) {
+                return false
             }
+
+            if (!workspace.members.contains(player.uniqueId.toString())) {
+                return false
+            }
+
+            workspace.members = workspace.members.replace("," + player.uniqueId.toString(), "")
+            workspace.updatedAt = System.currentTimeMillis()
+
+            table.update(dataSource) {
+                set("members", workspace.members)
+                set("updated_at", workspace.updatedAt)
+                where { "id" eq workspace.id }
+            }
+            return true
         }
-
     }
-
-    var name by Workspaces.name
-    var desc by Workspaces.desc
-    var owner by Workspaces.owner
-    var type by Workspaces.type
-    var members by Workspaces.members
-    var createdAt by Workspaces.createdAt
-    var updatedAt by Workspaces.updatedAt
 
     fun rename(newName: String): ZephyrionAPI.Result {
         val result = ZephyrionAPI.validateWorkspaceName(newName, getOwner().uniqueId.toString())
         if (!result.success) {
             return result
         }
-        return transaction {
-            name = newName
-            updatedAt = System.currentTimeMillis()
-            ZephyrionAPI.Result(true)
+
+        name = newName
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("name", name)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
         }
+        return ZephyrionAPI.Result(true)
     }
 
     fun getCreatedAt(): String {
-        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(createdAt))
+        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(createdAt))
     }
 
+    /**
+     * 获取更新时间(格式化)
+     */
     fun getUpdatedAt(): String {
-        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(updatedAt))
+        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(updatedAt))
     }
 
+    /**
+     * 获取拥有者
+     */
     fun getOwner(): OfflinePlayer {
         return Bukkit.getOfflinePlayer(UUID.fromString(owner))
     }
 
+    /**
+     * 获取所有成员
+     */
     fun getMembers(): List<OfflinePlayer> {
-        return members.split(",").map {
+        return members.split(",").filter { it.isNotBlank() }.map {
             Bukkit.getOfflinePlayer(UUID.fromString(it))
         }
     }
 
+    /**
+     * 获取所有成员名称
+     */
     fun getMembersName(): List<String> {
-        return members.split(",").mapNotNull {
+        return members.split(",").filter { it.isNotBlank() }.mapNotNull {
             val offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(it))
             offlinePlayer.name
         }
     }
 
-    override fun delete() {
-        val user =  ZephyrionAPI.getUserData(owner)
-        transaction {
-            super.delete()
-            user.workspaceUsed -= 1
+    /**
+     * 删除工作空间
+     */
+    fun delete() {
+        val user = ZephyrionAPI.getUserData(owner)
+        val currentWorkspaceUsed = user.workspaceUsed
+        val newWorkspaceUsed = currentWorkspaceUsed - 1
+
+        if (newWorkspaceUsed < 0) {
+            return
+        }
+
+        val quotasTable = DatabaseConfig.quotasTable
+
+        val affected = quotasTable.update(dataSource) {
+            set("workspace_used", newWorkspaceUsed)
+            where {
+                "player" eq owner
+                and { "workspace_used" eq currentWorkspaceUsed }
+            }
+        }
+
+        if (affected == 0) {
+            return
+        }
+
+        table.delete(dataSource) {
+            where { "id" eq id }
         }
     }
 
-    fun isMember(toString: String): Boolean {
-        return members.contains(toString)
+    /**
+     * 检查是否为成员
+     */
+    fun isMember(uuid: String): Boolean {
+        return members.contains(uuid)
     }
 }

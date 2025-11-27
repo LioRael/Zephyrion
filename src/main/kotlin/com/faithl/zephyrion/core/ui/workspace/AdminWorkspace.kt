@@ -5,7 +5,6 @@ import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setSplitBlock
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import org.jetbrains.exposed.sql.transactions.transaction
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -109,10 +108,17 @@ class AdminWorkspace(override val opener: Player, val workspace: Workspace, val 
             opener.sendLang("workspace-admin-input-desc")
             opener.nextChat {
                 sync {
-                    transaction {
-                        workspace.desc = it
-                        workspace.updatedAt = System.currentTimeMillis()
+                    workspace.desc = it
+                    workspace.updatedAt = System.currentTimeMillis()
+
+                    val table = com.faithl.zephyrion.storage.DatabaseConfig.workspacesTable
+                    val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
+                    table.update(dataSource) {
+                        set("description", workspace.desc)
+                        set("updated_at", workspace.updatedAt)
+                        where { "id" eq workspace.id }
                     }
+
                     opener.sendLang("workspace-admin-reset-desc-succeed")
                     open()
                 }

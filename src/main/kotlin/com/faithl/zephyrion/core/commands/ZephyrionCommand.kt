@@ -9,15 +9,9 @@ import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import taboolib.common.platform.ProxyCommandSender
-import taboolib.common.platform.command.CommandBody
-import taboolib.common.platform.command.CommandHeader
-import taboolib.common.platform.command.PermissionDefault
-import taboolib.common.platform.command.mainCommand
-import taboolib.common.platform.command.subCommand
-import taboolib.common.platform.function.console
+import taboolib.common.platform.command.*
 import taboolib.common.platform.function.onlinePlayers
 import taboolib.expansion.createHelper
-import taboolib.module.lang.asLangText
 import taboolib.module.lang.sendLang
 import taboolib.platform.util.asLangText
 import taboolib.platform.util.sendLang

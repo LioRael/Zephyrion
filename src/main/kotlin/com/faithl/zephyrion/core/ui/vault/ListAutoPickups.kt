@@ -2,7 +2,7 @@ package com.faithl.zephyrion.core.ui.vault
 
 import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.AutoPickup
-import com.faithl.zephyrion.core.models.AutoPickups
+import com.faithl.zephyrion.core.models.AutoPickupType
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.UI
@@ -45,8 +45,8 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, val root: U
         params["type"]?.let { searchType ->
             rules.retainAll { rule ->
                 when (searchType.lowercase()) {
-                    "pickup", "拾取" -> rule.type == AutoPickups.Type.ITEM_PICKUP
-                    "not-pickup", "notpickup", "不拾取" -> rule.type == AutoPickups.Type.ITEM_NOT_PICKUP
+                    "pickup", "拾取" -> rule.type == AutoPickupType.ITEM_PICKUP
+                    "not-pickup", "notpickup", "不拾取" -> rule.type == AutoPickupType.ITEM_NOT_PICKUP
                     else -> true
                 }
             }
@@ -87,7 +87,7 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, val root: U
     fun setElements(menu: PageableChest<AutoPickup>) {
         menu.elements { rules }
         menu.onGenerate { _, element, _, _ ->
-            if (element.type == AutoPickups.Type.ITEM_PICKUP) {
+            if (element.type == AutoPickupType.ITEM_PICKUP) {
                 buildItem(XMaterial.LIME_DYE) {
                     name = opener.asLangText("auto-pickup-rule-pickup-name", element.value)
                     lore += opener.asLangTextList("auto-pickup-rule-pickup-desc", element.value)
@@ -143,9 +143,9 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, val root: U
             opener.nextChat {
                 sync {
                     val ruleType = if (event.clickEvent().isLeftClick) {
-                        AutoPickups.Type.ITEM_PICKUP
+                        AutoPickupType.ITEM_PICKUP
                     } else {
-                        AutoPickups.Type.ITEM_NOT_PICKUP
+                        AutoPickupType.ITEM_NOT_PICKUP
                     }
                     val result = ZephyrionAPI.createAutoPickup(vault, ruleType, it)
                     if (result.success) {
@@ -165,8 +165,8 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, val root: U
     fun setInfoItem(menu: PageableChest<AutoPickup>) {
         menu.set(46) {
             val allRules = ZephyrionAPI.getAutoPickups(vault)
-            val pickupCount = allRules.count { it.type == AutoPickups.Type.ITEM_PICKUP }
-            val notPickupCount = allRules.count { it.type == AutoPickups.Type.ITEM_NOT_PICKUP }
+            val pickupCount = allRules.count { it.type == AutoPickupType.ITEM_PICKUP }
+            val notPickupCount = allRules.count { it.type == AutoPickupType.ITEM_NOT_PICKUP }
 
             buildItem(XMaterial.BOOK) {
                 name = opener.asLangText("auto-pickup-info-name")

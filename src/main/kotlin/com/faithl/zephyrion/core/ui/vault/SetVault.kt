@@ -1,7 +1,6 @@
 package com.faithl.zephyrion.core.ui.vault
 
 import com.faithl.zephyrion.core.models.Setting
-import com.faithl.zephyrion.core.models.Settings
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setLinkedMenuProperties
@@ -21,9 +20,9 @@ class SetVault(val vault: Vault, override val opener: Player) : UI() {
 
     override fun build(): Inventory {
         return buildMenu<PageableChestImpl<Setting>>(title()) {
-            elements {
-                Setting.find { Settings.vault eq vault.id }.toList()
-            }
+//            elements {
+//                Setting.getSettings(vault)
+//            }
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
         }

@@ -4,6 +4,7 @@ plugin-reload: "&b[Zephyrion] &cZephyrion已重载!"
 no-permission: "&b[Zephyrion] &c你没有权限使用这个命令!"
 no-console: "&b[Zephyrion] &c控制台无法使用这个命令!"
 no-player: "&b[Zephyrion] &c你必须是一个玩家才能使用这个命令!"
+ui-load-error: "&b[Zephyrion] &c界面加载失败，请稍后重试!"
 
 independent-workspace: "独立工作空间"
 independent-workspace-desc: "独立工作空间将存在于每位玩家的工作空间列表中，内部仓库物品相互独立"

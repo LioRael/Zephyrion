@@ -4,7 +4,7 @@ import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.models.Workspace
-import com.faithl.zephyrion.core.models.Workspaces
+import com.faithl.zephyrion.core.models.WorkspaceType
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.search.Search
@@ -13,7 +13,7 @@ import com.faithl.zephyrion.core.ui.setLinkedMenuProperties
 import com.faithl.zephyrion.core.ui.setRows6SplitBlock
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import org.jetbrains.exposed.sql.transactions.transaction
+import taboolib.common.platform.function.submitAsync
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -68,7 +68,6 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
     }
 
     override fun build(): Inventory {
-        search()
         return buildMenu<PageableChestImpl<Vault>>(title()) {
             setLinkedMenuProperties(this)
             setRows6SplitBlock(this)
@@ -85,25 +84,23 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
         menu.onGenerate { _, element, _, _ ->
             buildItem(XMaterial.CHEST) {
                 name = opener.asLangText("vaults-main-item-name", element.name)
-                transaction {
-                    lore += if (element.workspace.owner == opener.uniqueId.toString() ||
-                        ZephyrionAPI.isPluginAdmin(opener)) {
-                        opener.asLangTextList(
-                            "vaults-main-item-admin-desc",
-                            element.id,
-                            element.desc ?: "",
-                            element.getCreatedAt(),
-                            element.getUpdatedAt()
-                        )
-                    } else {
-                        opener.asLangTextList(
-                            "vaults-main-item-member-desc",
-                            element.id,
-                            element.desc ?: "",
-                            element.getCreatedAt(),
-                            element.getUpdatedAt()
-                        )
-                    }
+                lore += if (element.workspace.owner == opener.uniqueId.toString() ||
+                    ZephyrionAPI.isPluginAdmin(opener)) {
+                    opener.asLangTextList(
+                        "vaults-main-item-admin-desc",
+                        element.id,
+                        element.desc ?: "",
+                        element.getCreatedAt(),
+                        element.getUpdatedAt()
+                    )
+                } else {
+                    opener.asLangTextList(
+                        "vaults-main-item-member-desc",
+                        element.id,
+                        element.desc ?: "",
+                        element.getCreatedAt(),
+                        element.getUpdatedAt()
+                    )
                 }
             }
         }
@@ -111,11 +108,9 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
             if (event.clickEvent().isLeftClick) {
                 VaultUI(event.clicker, element, this@ListVaults).open()
             } else if (event.clickEvent().isRightClick) {
-                transaction {
-                    if (element.workspace.owner == opener.uniqueId.toString() ||
-                        ZephyrionAPI.isPluginAdmin(opener)) {
-                        AdminVault(event.clicker, element, this@ListVaults).open()
-                    }
+                if (element.workspace.owner == opener.uniqueId.toString() ||
+                    ZephyrionAPI.isPluginAdmin(opener)) {
+                    AdminVault(event.clicker, element, this@ListVaults).open()
                 }
             }
         }
@@ -124,7 +119,7 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
     fun setCreateItem(menu: PageableChest<Vault>) {
         if (workspace.owner == opener.uniqueId.toString() ||
             ZephyrionAPI.isPluginAdmin(opener) ||
-            (workspace.type == Workspaces.Type.INDEPENDENT && opener.hasPermission(
+            (workspace.type == WorkspaceType.INDEPENDENT && opener.hasPermission(
                 Zephyrion.permissions.getString("create-independent-workspace")!!
             ))
         ) {
@@ -197,7 +192,20 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
         if (!ZephyrionAPI.isPluginAdmin(opener) && !workspace.isMember(opener.uniqueId.toString())) {
             return
         }
-        opener.openInventory(build())
+
+        submitAsync {
+            try {
+                search()
+                sync {
+                    opener.openInventory(build())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                sync {
+                    opener.sendLang("ui-load-error")
+                }
+            }
+        }
     }
 
     override fun title(): String {

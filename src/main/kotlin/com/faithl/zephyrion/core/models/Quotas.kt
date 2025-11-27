@@ -1,40 +1,88 @@
 package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.Zephyrion
-import com.faithl.zephyrion.core.models.Quotas.player
+import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.Bukkit
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.UUID
+import taboolib.module.database.HostSQL
+import taboolib.module.database.HostSQLite
+import taboolib.module.database.Table
+import java.util.*
 
-object Quotas : IntIdTable() {
+/**
+ * Quota数据类
+ */
+data class Quota(
+    var id: Int,
+    var player: String,
+    var workspaceQuotas: Int,
+    var workspaceUsed: Int,
+    var sizeQuotas: Int,
+    var sizeUsed: Int,
+    var unlimited: Boolean
+) {
 
-    val player = varchar("player", 36)
-    val workspaceQuotas = integer("workspace_quotas")
-    val workspaceUsed = integer("workspace_used")
-    val sizeQuotas = integer("size_quotas")
-    val sizeUsed = integer("size_used")
-    val unlimited = bool("unlimited")
+    companion object {
 
-}
+        private val table: Table<*, *>
+            get() = DatabaseConfig.quotasTable
 
-class Quota(id: EntityID<Int>) : IntEntity(id) {
+        private val dataSource
+            get() = DatabaseConfig.dataSource
 
-    companion object : IntEntityClass<Quota>(Quotas) {
+        /**
+         * 获取用户配额数据
+         * 如果不存在则创建,并根据权限组设置配额
+         */
         fun getUser(playerUniqueId: String): Quota {
-            val quota = find { player eq playerUniqueId }.firstOrNull() ?: new {
-                this.player = playerUniqueId
-                this.workspaceQuotas = Zephyrion.settings.getInt("user.default-quotas.workspace")
-                this.workspaceUsed = 0
-                this.sizeQuotas = Zephyrion.settings.getInt("user.default-quotas.size")
-                this.sizeUsed = 0
-                this.unlimited = Zephyrion.settings.getBoolean("user.default-quotas.unlimited")
+            // 先查询数据库
+            val existing = table.select(dataSource) {
+                where { "player" eq playerUniqueId }
+            }.firstOrNull {
+                Quota(
+                    id = getInt("id"),
+                    player = getString("player"),
+                    workspaceQuotas = getInt("workspace_quotas"),
+                    workspaceUsed = getInt("workspace_used"),
+                    sizeQuotas = getInt("size_quotas"),
+                    sizeUsed = getInt("size_used"),
+                    unlimited = when (DatabaseConfig.host) {
+                        is HostSQL -> getBoolean("unlimited")
+                        is HostSQLite -> getInt("unlimited") != 0
+                        else -> false
+                    }
+                )
             }
 
-            val player = Bukkit.getPlayer(UUID.fromString(playerUniqueId)) ?: return quota
+            // 如果存在,更新配额(根据权限组)
+            if (existing != null) {
+                updateQuotasByPermission(existing, playerUniqueId)
+                return existing
+            }
+
+            // 不存在则创建
+            val defaultWorkspace = Zephyrion.settings.getInt("user.default-quotas.workspace")
+            val defaultSize = Zephyrion.settings.getInt("user.default-quotas.size")
+            val defaultUnlimited = Zephyrion.settings.getBoolean("user.default-quotas.unlimited")
+
+            table.insert(dataSource, "player", "workspace_quotas", "workspace_used", "size_quotas", "size_used", "unlimited") {
+                value(
+                    playerUniqueId,
+                    defaultWorkspace,
+                    0,
+                    defaultSize,
+                    0,
+                    if (DatabaseConfig.host is HostSQLite) (if (defaultUnlimited) 1 else 0) else defaultUnlimited
+                )
+            }
+
+            return getUser(playerUniqueId)
+        }
+
+        /**
+         * 根据玩家权限组更新配额
+         */
+        private fun updateQuotasByPermission(quota: Quota, playerUniqueId: String) {
+            val player = Bukkit.getPlayer(UUID.fromString(playerUniqueId)) ?: return
 
             var matchedGroup: String? = null
             Zephyrion.settings.getConfigurationSection("user")?.getKeys(false)?.forEach { groupKey ->
@@ -56,142 +104,144 @@ class Quota(id: EntityID<Int>) : IntEntity(id) {
                 quota.unlimited = Zephyrion.settings.getBoolean("user.default-quotas.unlimited")
             }
 
-            return quota
+            // 更新数据库
+            table.update(dataSource) {
+                set("workspace_quotas", quota.workspaceQuotas)
+                set("size_quotas", quota.sizeQuotas)
+                set("unlimited", if (DatabaseConfig.host is HostSQLite) (if (quota.unlimited) 1 else 0) else quota.unlimited)
+                where { "player" eq playerUniqueId }
+            }
         }
 
         /**
          * 设置玩家的工作空间配额
-         * @param playerUniqueId 玩家 UUID
-         * @param quota 新配额值
-         * @return 是否成功
          */
         fun setWorkspaceQuota(playerUniqueId: String, quota: Int): Boolean {
             if (quota < 0) return false
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                userData.workspaceQuotas = quota
-                true
+
+            val userData = getUser(playerUniqueId)
+            userData.workspaceQuotas = quota
+
+            table.update(dataSource) {
+                set("workspace_quotas", quota)
+                where { "player" eq playerUniqueId }
             }
+            return true
         }
 
         /**
          * 增加玩家的工作空间配额
-         * @param playerUniqueId 玩家 UUID
-         * @param amount 增加的数量
-         * @return 是否成功
          */
         fun addWorkspaceQuota(playerUniqueId: String, amount: Int): Boolean {
             if (amount <= 0) return false
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                userData.workspaceQuotas += amount
-                true
+
+            val userData = getUser(playerUniqueId)
+            val newQuota = userData.workspaceQuotas + amount
+
+            table.update(dataSource) {
+                set("workspace_quotas", newQuota)
+                where { "player" eq playerUniqueId }
             }
+            return true
         }
 
         /**
          * 减少玩家的工作空间配额
-         * @param playerUniqueId 玩家 UUID
-         * @param amount 减少的数量
-         * @return 是否成功
          */
         fun removeWorkspaceQuota(playerUniqueId: String, amount: Int): Boolean {
             if (amount <= 0) return false
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                if (userData.workspaceQuotas - amount < userData.workspaceUsed) {
-                    false
-                } else {
-                    userData.workspaceQuotas -= amount
-                    true
-                }
+
+            val userData = getUser(playerUniqueId)
+            if (userData.workspaceQuotas - amount < userData.workspaceUsed) {
+                return false
             }
+
+            table.update(dataSource) {
+                set("workspace_quotas", userData.workspaceQuotas - amount)
+                where { "player" eq playerUniqueId }
+            }
+            return true
         }
 
         /**
          * 设置玩家的容量配额
-         * @param playerUniqueId 玩家 UUID
-         * @param quota 新配额值
-         * @return 是否成功
          */
         fun setSizeQuota(playerUniqueId: String, quota: Int): Boolean {
             if (quota < 0) return false
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                userData.sizeQuotas = quota
-                true
+
+            val userData = getUser(playerUniqueId)
+            userData.sizeQuotas = quota
+
+            table.update(dataSource) {
+                set("size_quotas", quota)
+                where { "player" eq playerUniqueId }
             }
+            return true
         }
 
         /**
          * 增加玩家的容量配额
-         * @param playerUniqueId 玩家 UUID
-         * @param amount 增加的数量
-         * @return 是否成功
          */
         fun addSizeQuota(playerUniqueId: String, amount: Int): Boolean {
             if (amount <= 0) return false
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                userData.sizeQuotas += amount
-                true
+
+            val userData = getUser(playerUniqueId)
+            val newQuota = userData.sizeQuotas + amount
+
+            table.update(dataSource) {
+                set("size_quotas", newQuota)
+                where { "player" eq playerUniqueId }
             }
+            return true
         }
 
         /**
          * 减少玩家的容量配额
-         * @param playerUniqueId 玩家 UUID
-         * @param amount 减少的数量
-         * @return 是否成功
          */
         fun removeSizeQuota(playerUniqueId: String, amount: Int): Boolean {
             if (amount <= 0) return false
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                if (userData.sizeQuotas - amount < userData.sizeUsed) {
-                    false
-                } else {
-                    userData.sizeQuotas -= amount
-                    true
-                }
+
+            val userData = getUser(playerUniqueId)
+            if (userData.sizeQuotas - amount < userData.sizeUsed) {
+                return false
             }
+
+            table.update(dataSource) {
+                set("size_quotas", userData.sizeQuotas - amount)
+                where { "player" eq playerUniqueId }
+            }
+            return true
         }
 
         /**
          * 设置玩家的无限配额状态
-         * @param playerUniqueId 玩家 UUID
-         * @param unlimited 是否启用无限配额
-         * @return 是否成功
          */
         fun setUnlimited(playerUniqueId: String, unlimited: Boolean): Boolean {
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                userData.unlimited = unlimited
-                true
+            val userData = getUser(playerUniqueId)
+            userData.unlimited = unlimited
+
+            table.update(dataSource) {
+                set("unlimited", if (DatabaseConfig.host is HostSQLite) (if (unlimited) 1 else 0) else unlimited)
+                where { "player" eq playerUniqueId }
             }
+            return true
         }
 
         /**
          * 重置玩家的配额为默认值
-         * @param playerUniqueId 玩家 UUID
-         * @return 是否成功
          */
         fun resetQuota(playerUniqueId: String): Boolean {
-            return transaction {
-                val userData = getUser(playerUniqueId)
-                userData.workspaceQuotas = Zephyrion.settings.getInt("user.default-quotas.workspace")
-                userData.sizeQuotas = Zephyrion.settings.getInt("user.default-quotas.size")
-                userData.unlimited = Zephyrion.settings.getBoolean("user.default-quotas.unlimited")
-                true
+            val defaultWorkspace = Zephyrion.settings.getInt("user.default-quotas.workspace")
+            val defaultSize = Zephyrion.settings.getInt("user.default-quotas.size")
+            val defaultUnlimited = Zephyrion.settings.getBoolean("user.default-quotas.unlimited")
+
+            table.update(dataSource) {
+                set("workspace_quotas", defaultWorkspace)
+                set("size_quotas", defaultSize)
+                set("unlimited", if (DatabaseConfig.host is HostSQLite) (if (defaultUnlimited) 1 else 0) else defaultUnlimited)
+                where { "player" eq playerUniqueId }
             }
+            return true
         }
     }
-
-    var player by Quotas.player
-    var workspaceQuotas by Quotas.workspaceQuotas
-    var workspaceUsed by Quotas.workspaceUsed
-    var sizeQuotas by Quotas.sizeQuotas
-    var sizeUsed by Quotas.sizeUsed
-    var unlimited by Quotas.unlimited
-
 }
