@@ -1,10 +1,12 @@
 package com.faithl.zephyrion.storage
 
 import com.faithl.zephyrion.Zephyrion
+import taboolib.common.platform.function.console
 import taboolib.module.database.Host
 import taboolib.module.database.HostSQL
 import taboolib.module.database.HostSQLite
 import taboolib.module.database.Table
+import taboolib.module.lang.sendErrorMessage
 import java.io.File
 import javax.sql.DataSource
 
@@ -17,7 +19,6 @@ object DatabaseConfig {
         host.createDataSource()
     }
 
-    // 表列表 - 将在迁移过程中逐步添加
     lateinit var workspacesTable: Table<*, *>
     lateinit var vaultsTable: Table<*, *>
     lateinit var itemsTable: Table<*, *>
@@ -32,12 +33,18 @@ object DatabaseConfig {
 
     private fun connectToDatabase() {
         val type = Zephyrion.settings.getString("database.type")
-            ?: error("database type is not set")
+            ?: run{
+                console().sendErrorMessage("database type is not set")
+                "sqlite"
+            }
 
         host = when (type.lowercase()) {
             "sqlite" -> createSQLiteHost()
             "mysql" -> createMySQLHost()
-            else -> error("unsupported database type: $type")
+            else ->  run {
+                console().sendErrorMessage("unsupported database type: $type")
+                createSQLiteHost()
+            }
         }
     }
 

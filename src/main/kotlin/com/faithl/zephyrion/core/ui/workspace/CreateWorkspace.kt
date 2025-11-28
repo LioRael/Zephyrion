@@ -7,6 +7,7 @@ import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setSplitBlock
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
+import taboolib.common.platform.function.submit
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -238,7 +239,9 @@ class CreateWorkspace(override val opener: Player, val root: UI) : UI() {
 
                 null -> {
                     opener.sendLang("workspace-create-succeed")
-                    root.open()
+                    submit(delay = 1) {
+                        root.open()
+                    }
                 }
             }
         }

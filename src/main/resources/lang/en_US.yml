@@ -256,6 +256,19 @@ vault-main-search-by-lore-input: "&b[Zephyrion] Please enter the item lore"
 vault-main-search-requirement: "&b[Zephyrion] Search function can only be used when there is only 1 person using the vault."
 vault-main-quit-search: "&cQuit Search"
 
+# Search result mode
+vault-search-prev-page: "&bPrevious Page"
+vault-search-prev-page-disabled: "&7No previous page"
+vault-search-next-page: "&bNext Page"
+vault-search-next-page-disabled: "&7No next page"
+vault-search-info-title: "&bSearch Results"
+vault-search-info-count: "&7Found {0} items"
+vault-search-info-page: "&7Page: {0}/{1}"
+vault-search-info-condition: "&7{0}: &f{1}"
+vault-search-info-click-to-modify: "&7Click to modify search conditions"
+vault-search-exit: "&cExit Search"
+vault-search-no-results: "&7No items found matching the criteria"
+
 # Quota related
 quota-header-self: "&a========== Your Quota Information =========="
 quota-header-other: "&a========== {0}'s Quota Information =========="

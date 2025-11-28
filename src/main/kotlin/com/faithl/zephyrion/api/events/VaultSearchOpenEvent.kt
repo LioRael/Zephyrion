@@ -5,11 +5,14 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.platform.type.BukkitProxyEvent
 
-class VaultCloseEvent(
+/**
+ * 保险库搜索模式打开事件
+ */
+class VaultSearchOpenEvent(
     val vault: Vault,
-    val page: Int,
+    val params: Map<String, String>,
     val inventory: Inventory,
-    val closer: Player,
+    val opener: Player,
 ) : BukkitProxyEvent() {
 
     override val allowCancelled: Boolean

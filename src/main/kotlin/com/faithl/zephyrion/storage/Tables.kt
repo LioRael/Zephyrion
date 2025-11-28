@@ -529,6 +529,11 @@ object AutoPickupsTable {
                             options(ColumnOptionSQL.NOTNULL)
                         }
                     }
+                    add("updated_at") {
+                        type(ColumnTypeSQL.BIGINT) {
+                            options(ColumnOptionSQL.NOTNULL)
+                        }
+                    }
                 }
             }
             is HostSQLite -> {
@@ -557,6 +562,11 @@ object AutoPickupsTable {
                         }
                     }
                     add("created_at") {
+                        type(ColumnTypeSQLite.INTEGER) {
+                            options(ColumnOptionSQLite.NOTNULL)
+                        }
+                    }
+                    add("updated_at") {
                         type(ColumnTypeSQLite.INTEGER) {
                             options(ColumnOptionSQLite.NOTNULL)
                         }

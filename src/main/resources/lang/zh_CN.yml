@@ -258,6 +258,19 @@ vault-main-search-by-lore-input: "&b[Zephyrion] 请输入物品lore"
 vault-main-search-requirement: "&b[Zephyrion] 只能在只有 1 人正在使用仓库时才能使用搜索功能"
 vault-main-quit-search: "&b退出搜索"
 
+# 搜索结果模式
+vault-search-prev-page: "&b上一页"
+vault-search-prev-page-disabled: "&7没有上一页了"
+vault-search-next-page: "&b下一页"
+vault-search-next-page-disabled: "&7没有下一页了"
+vault-search-info-title: "&b搜索结果"
+vault-search-info-count: "&7找到 {0} 个物品"
+vault-search-info-page: "&7页数: {0}/{1}"
+vault-search-info-condition: "&7{0}: &f{1}"
+vault-search-info-click-to-modify: "&7点击修改搜索条件"
+vault-search-exit: "&c退出搜索"
+vault-search-no-results: "&7没有找到符合条件的物品"
+
 # 配额相关
 quota-header-self: "&a========== 你的配额信息 =========="
 quota-header-other: "&a========== {0} 的配额信息 =========="

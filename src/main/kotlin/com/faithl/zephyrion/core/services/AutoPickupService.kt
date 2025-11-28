@@ -152,7 +152,7 @@ object AutoPickupService {
 
             for (slot in 0 until slotsInPage) {
                 if (slot !in usedSlots) {
-                    Item.setItem(vault, page, slot, itemStack, player)
+                    ZephyrionAPI.setItem(vault, page, slot, itemStack, player)
                     return true
                 }
             }

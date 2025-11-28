@@ -115,14 +115,12 @@ class Search(override val opener: Player, val elements: List<SearchItem>, val ro
                 }
             }
             onClick(31) {
-                // 确认搜索：创建新的VaultUI实例（page=1）并传递搜索参数
+                // 确认搜索：调用 search() 方法执行搜索
                 val vaultUI = root as? VaultUI
                 if (vaultUI != null) {
-                    val newUI = VaultUI(opener, vaultUI.vault, vaultUI.root)
-                    newUI.params.putAll(vaultUI.params)
-                    newUI.open()
+                    vaultUI.search()
                 } else {
-                    root.open()
+                    root.search()
                 }
             }
             set(35) {

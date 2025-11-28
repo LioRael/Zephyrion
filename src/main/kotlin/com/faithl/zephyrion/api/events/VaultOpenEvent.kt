@@ -5,8 +5,12 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.platform.type.BukkitProxyEvent
 
-class VaultOpenEvent(val vault: Vault, val page: Int, val inventory: Inventory, val opener: Player) :
-    BukkitProxyEvent() {
+class VaultOpenEvent(
+    val vault: Vault,
+    val page: Int,
+    val inventory: Inventory,
+    val opener: Player,
+) : BukkitProxyEvent() {
 
     override val allowCancelled: Boolean
         get() = false

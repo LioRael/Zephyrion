@@ -5,9 +5,12 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.platform.type.BukkitProxyEvent
 
-class VaultCloseEvent(
+/**
+ * 保险库搜索模式关闭事件
+ */
+class VaultSearchCloseEvent(
     val vault: Vault,
-    val page: Int,
+    val params: Map<String, String>,
     val inventory: Inventory,
     val closer: Player,
 ) : BukkitProxyEvent() {

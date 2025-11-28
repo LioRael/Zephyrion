@@ -183,6 +183,10 @@ object ZephyrionAPI {
         return Item.searchItemsByLore(vault, lore)
     }
 
+    fun searchItems(vault: Vault, params: Map<String, String>, player: Player? = null): List<Item> {
+        return Item.searchItems(vault, params, player)
+    }
+
     fun getItems(vault: Vault, page: Int, player: Player): List<Item> {
         return Item.getItems(vault, page, player)
     }
