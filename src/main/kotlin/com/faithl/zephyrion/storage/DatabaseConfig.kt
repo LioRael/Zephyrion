@@ -69,7 +69,7 @@ object DatabaseConfig {
             port = port,
             user = username,
             password = password,
-            database = database
+            database = database,
         )
     }
 
@@ -100,6 +100,20 @@ object DatabaseConfig {
         // 创建 AutoPickups 表
         autoPickupsTable = AutoPickupsTable.createTable(host)
         autoPickupsTable.createTable(dataSource)
+
+        // MySQL 设置表字符集为 utf8mb4
+        if (host is HostSQL) {
+            val tables = listOf("quotas", "workspaces", "vaults", "items", "settings", "auto_pickups")
+            dataSource.connection.use { conn ->
+                tables.forEach { name ->
+                    runCatching {
+                        conn.prepareStatement(
+                            "ALTER TABLE `${getTableName(name)}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                        ).use { it.executeUpdate() }
+                    }
+                }
+            }
+        }
     }
 
     /**

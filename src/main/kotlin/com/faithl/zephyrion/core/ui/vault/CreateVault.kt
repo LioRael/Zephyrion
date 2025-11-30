@@ -16,7 +16,7 @@ import taboolib.platform.util.buildItem
 import taboolib.platform.util.nextChat
 import taboolib.platform.util.sendLang
 
-class CreateVault(override val opener: Player, val workspace: Workspace, val root: UI? = null) : UI() {
+class CreateVault(override val opener: Player, val workspace: Workspace,override val root: UI? = null) : UI() {
 
     var name: String? = null
     var description: String? = null
@@ -74,10 +74,8 @@ class CreateVault(override val opener: Player, val workspace: Workspace, val roo
             opener.closeInventory()
             opener.sendLang("vaults-create-input-name")
             opener.nextChat {
-                sync {
-                    name = it
-                    open()
-                }
+                name = it
+                sync { open() }
             }
         }
     }
@@ -96,18 +94,16 @@ class CreateVault(override val opener: Player, val workspace: Workspace, val roo
             opener.closeInventory()
             opener.sendLang("vaults-create-input-desc")
             opener.nextChat {
-                sync {
-                    description = it
-                    open()
-                }
+                description = it
+                sync { open() }
             }
         }
     }
 
-    fun setReturnItem(menu: Chest) {
+    override fun setReturnItem(menu: Chest) {
         menu.set('R') {
             buildItem(XMaterial.BARRIER) {
-                name = opener.asLangText("vaults-create-return")
+                name = opener.asLangText("ui-item-name-return")
             }
         }
         menu.onClick('R') {

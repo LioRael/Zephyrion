@@ -7,11 +7,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.util.io.BukkitObjectInputStream
 import org.bukkit.util.io.BukkitObjectOutputStream
-import taboolib.common.platform.function.submit
-import taboolib.common.platform.function.submitAsync
-import taboolib.common.util.sync
 import taboolib.module.database.Table
-import taboolib.module.nms.getI18nName
 import taboolib.module.nms.getName
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -172,86 +168,78 @@ data class Item(
          * 设置物品
          */
         fun setItem(vault: Vault, page: Int, slot: Int, itemStack: ItemStack, player: Player? = null) {
-            submitAsync {
-                val existing = if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
-                    table.select(dataSource) {
-                        where {
-                            "vault_id" eq vault.id
-                            and { "page" eq page }
-                            and { "slot" eq slot }
+            val existing = if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+                table.select(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                        and { "owner" eq player!!.uniqueId.toString() }
+                    }
+                }.find()
+            } else {
+                table.select(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                    }
+                }.find()
+            }
+
+            val itemBase64 = itemStack.toBase64()
+
+            if (!existing) {
+                // 插入新记录
+                table.insert(dataSource, "vault_id", "page", "owner", "slot", "item_stack") {
+                    value(
+                        vault.id,
+                        page,
+                        if (vault.workspace.type == WorkspaceType.INDEPENDENT) player!!.uniqueId.toString() else null,
+                        slot,
+                        itemBase64
+                    )
+                }
+            } else {
+                // 更新现有记录
+                table.update(dataSource) {
+                    set("item_stack", itemBase64)
+                    where {
+                        "vault_id" eq vault.id
+                        "page" eq page
+                        "slot" eq slot
+                        if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
                             and { "owner" eq player!!.uniqueId.toString() }
                         }
-                    }.find()
-                } else {
-                    table.select(dataSource) {
-                        where {
-                            "vault_id" eq vault.id
-                            and { "page" eq page }
-                            and { "slot" eq slot }
-                        }
-                    }.find()
-                }
-
-                val itemBase64 = itemStack.toBase64()
-
-                if (!existing) {
-                    // 插入新记录
-                    table.insert(dataSource, "vault_id", "page", "owner", "slot", "item_stack") {
-                        value(
-                            vault.id,
-                            page,
-                            if (vault.workspace.type == WorkspaceType.INDEPENDENT) player!!.uniqueId.toString() else null,
-                            slot,
-                            itemBase64
-                        )
                     }
-                } else {
-                    // 更新现有记录
-                    table.update(dataSource) {
-                        set("item_stack", itemBase64)
-                        where {
-                            "vault_id" eq vault.id
-                            "page" eq page
-                            "slot" eq slot
-                            if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
-                                and { "owner" eq player!!.uniqueId.toString() }
-                            }
-                        }
-                    }
-                }
-                sync {
-                    VaultAddItemEvent(vault, page, slot, itemStack, player).call()
                 }
             }
+            VaultAddItemEvent(vault, page, slot, itemStack, player).call()
         }
 
         /**
          * 删除物品
          */
         fun removeItem(vault: Vault, page: Int, slot: Int, player: Player? = null) {
-            submitAsync {
-                if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
-                    table.delete(dataSource) {
-                        where {
-                            "vault_id" eq vault.id
-                            and { "page" eq page }
-                            and { "slot" eq slot }
-                            and { "owner" eq player!!.uniqueId.toString() }
-                        }
-                    }
-                } else {
-                    table.delete(dataSource) {
-                        where {
-                            "vault_id" eq vault.id
-                            and { "page" eq page }
-                            and { "slot" eq slot }
-                        }
+            if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+                table.delete(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                        and { "owner" eq player!!.uniqueId.toString() }
                     }
                 }
-                sync {
-                    VaultRemoveItemEvent(vault, page, slot, player).call()
+            } else {
+                table.delete(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                    }
                 }
             }
+            VaultRemoveItemEvent(vault, page, slot, player).call()
         }
 
         private fun toBase64(itemStack: ItemStack): String {

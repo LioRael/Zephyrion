@@ -1,11 +1,9 @@
 package com.faithl.zephyrion.core.ui.workspace
 
-import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Workspace
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.UI
-import com.faithl.zephyrion.core.ui.search.Search
 import com.faithl.zephyrion.core.ui.search.SearchItem
 import com.faithl.zephyrion.core.ui.setLinkedMenuProperties
 import com.faithl.zephyrion.core.ui.setRows6SplitBlock
@@ -13,7 +11,6 @@ import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import taboolib.common.platform.function.submitAsync
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -24,12 +21,9 @@ import taboolib.platform.util.buildItem
 import taboolib.platform.util.nextChat
 import taboolib.platform.util.sendLang
 
-class ListMembers(override val opener: Player, val workspace: Workspace, val root: UI) : SearchUI() {
+class ListMembers(override val opener: Player, val workspace: Workspace, override val root: UI) : SearchUI() {
 
     val members = mutableListOf<OfflinePlayer>()
-    val searchItems = mutableListOf<SearchItem>()
-    override val params = mutableMapOf<String, String>()
-    val searchUI = Search(opener, searchItems, this)
 
     init {
         addSearchItems("name")
@@ -134,9 +128,7 @@ class ListMembers(override val opener: Player, val workspace: Workspace, val roo
                 val target = Bukkit.getPlayer(it)
                 if (target == null) {
                     opener.sendLang("workspace-members-add-offline")
-                    sync {
-                        open()
-                    }
+                    sync { open() }
                     return@nextChat
                 }
                 val result = ZephyrionAPI.addMember(workspace, target)
@@ -145,53 +137,18 @@ class ListMembers(override val opener: Player, val workspace: Workspace, val roo
                 } else {
                     opener.sendLang("workspace-members-add-existed")
                 }
-                sync {
-                    open()
-                }
+                sync { open() }
             }
-        }
-    }
-
-    fun setReturnItem(menu: PageableChest<OfflinePlayer>) {
-        menu.set(53) {
-            buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = opener.asLangText("workspace-members-return")
-            }
-        }
-        menu.onClick(53) {
-            root.open()
-        }
-    }
-
-    fun setSearchItem(menu: PageableChest<OfflinePlayer>) {
-        menu.set(49) {
-            buildItem(XMaterial.COMPASS) {
-                name = opener.asLangText("workspace-members-search")
-            }
-        }
-        menu.onClick(49) {
-            val permission = Zephyrion.settings.getString("permissions.add-member")
-            if (permission != null && !opener.hasPermission(permission)) {
-                opener.sendLang("workspace-members-add-no-perm")
-                return@onClick
-            }
-            searchUI.open()
         }
     }
 
     override fun open() {
-        submitAsync {
-            try {
-                search()
-                sync {
-                    opener.openInventory(build())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                sync {
-                    opener.sendLang("ui-load-error")
-                }
-            }
+        try {
+            search()
+            opener.openInventory(build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+            opener.sendLang("ui-load-error")
         }
     }
 
@@ -212,9 +169,7 @@ class ListMembers(override val opener: Player, val workspace: Workspace, val roo
             opener.sendLang("workspace-members-search-by-${name}-input")
             opener.nextChat {
                 params[name] = it
-                sync {
-                    searchUI.open()
-                }
+                sync { searchUI.open() }
             }
         }
     }

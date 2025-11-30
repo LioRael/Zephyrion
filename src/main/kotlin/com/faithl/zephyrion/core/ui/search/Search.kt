@@ -13,7 +13,7 @@ import taboolib.platform.util.buildItem
 
 data class SearchItem(val name: String, val description: String, val action: (clicker: Player) -> Unit)
 
-class Search(override val opener: Player, val elements: List<SearchItem>, val root: SearchUI) : UI() {
+class Search(override val opener: Player, val elements: List<SearchItem>, override val root: SearchUI) : UI() {
 
     override fun title(): String {
         return opener.asLangText("search-title")
@@ -72,13 +72,7 @@ class Search(override val opener: Player, val elements: List<SearchItem>, val ro
             onClick(29) {
                 if (root.params.isNotEmpty()) {
                     root.params.clear()
-                    // 清除搜索条件：创建新的VaultUI实例（page=1）
-                    val vaultUI = root as? VaultUI
-                    if (vaultUI != null) {
-                        VaultUI(opener, vaultUI.vault, vaultUI.root).open()
-                    } else {
-                        root.open()
-                    }
+                    open()
                 }
             }
             onGenerate { _, element, _, _ ->
@@ -119,8 +113,10 @@ class Search(override val opener: Player, val elements: List<SearchItem>, val ro
                 val vaultUI = root as? VaultUI
                 if (vaultUI != null) {
                     vaultUI.search()
+                    vaultUI.open()
                 } else {
                     root.search()
+                    root.open()
                 }
             }
             set(35) {

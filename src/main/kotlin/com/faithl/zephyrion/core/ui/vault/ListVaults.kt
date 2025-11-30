@@ -7,13 +7,11 @@ import com.faithl.zephyrion.core.models.Workspace
 import com.faithl.zephyrion.core.models.WorkspaceType
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.UI
-import com.faithl.zephyrion.core.ui.search.Search
 import com.faithl.zephyrion.core.ui.search.SearchItem
 import com.faithl.zephyrion.core.ui.setLinkedMenuProperties
 import com.faithl.zephyrion.core.ui.setRows6SplitBlock
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import taboolib.common.platform.function.submitAsync
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -21,12 +19,9 @@ import taboolib.module.ui.type.PageableChest
 import taboolib.module.ui.type.impl.PageableChestImpl
 import taboolib.platform.util.*
 
-class ListVaults(override val opener: Player, val workspace: Workspace, val root: UI? = null) : SearchUI() {
+class ListVaults(override val opener: Player, val workspace: Workspace, override val root: UI? = null) : SearchUI() {
 
     val vaults = mutableListOf<Vault>()
-    val searchItems = mutableListOf<SearchItem>()
-    override val params = mutableMapOf<String, String>()
-    val searchUI = Search(opener, searchItems, this)
 
     init {
         addSearchItems("name")
@@ -60,9 +55,7 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
             opener.sendLang("vaults-main-search-by-${name}-input")
             opener.nextChat {
                 params[name] = it
-                sync {
-                    searchUI.open()
-                }
+                sync { searchUI.open() }
             }
         }
     }
@@ -161,50 +154,17 @@ class ListVaults(override val opener: Player, val workspace: Workspace, val root
         }
     }
 
-    fun setReturnItem(menu: PageableChest<Vault>) {
-        menu.set(53) {
-            buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = if (root != null) {
-                    opener.asLangText("vaults-main-return")
-                } else {
-                    opener.asLangText("vaults-main-close")
-                }
-            }
-        }
-        menu.onClick(53) {
-            it.clicker.closeInventory()
-            root?.open()
-        }
-    }
-
-    fun setSearchItem(menu: PageableChest<Vault>) {
-        menu.set(49) {
-            buildItem(XMaterial.COMPASS) {
-                name = opener.asLangText("vaults-main-search")
-            }
-        }
-        menu.onClick(49) {
-            searchUI.open()
-        }
-    }
-
     override fun open() {
         if (!ZephyrionAPI.isPluginAdmin(opener) && !workspace.isMember(opener.uniqueId.toString())) {
             return
         }
 
-        submitAsync {
-            try {
-                search()
-                sync {
-                    opener.openInventory(build())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                sync {
-                    opener.sendLang("ui-load-error")
-                }
-            }
+        try {
+            search()
+            opener.openInventory(build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+            opener.sendLang("ui-load-error")
         }
     }
 

@@ -3,6 +3,7 @@ package com.faithl.zephyrion.core.ui.vault
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setSplitBlock
+import com.faithl.zephyrion.core.ui.vault.autopickup.ListAutoPickups
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.common.util.sync
@@ -12,7 +13,7 @@ import taboolib.module.ui.type.Chest
 import taboolib.module.ui.type.impl.ChestImpl
 import taboolib.platform.util.*
 
-class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = null) : UI() {
+class AdminVault(override val opener: Player, val vault: Vault, override val root: UI? = null) : UI() {
 
     override fun build(): Inventory {
         return buildMenu<ChestImpl>(title()) {
@@ -66,15 +67,15 @@ class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = 
             opener.closeInventory()
             opener.sendLang("vaults-admin-input-name")
             opener.nextChat {
-                sync {
-                    val result = vault.rename(it)
-                    when (result.reason) {
-                        "vault_name_invalid" -> opener.sendLang("vaults-admin-reset-name-invalid")
-                        "vault_already_exists" -> opener.sendLang("vaults-admin-reset-name-existed")
-                        "vault_name_color" -> opener.sendLang("vaults-admin-reset-name-color")
-                        "vault_name_length" -> opener.sendLang("vaults-admin-reset-name-length")
-                        null -> {
-                            opener.sendLang("vaults-admin-reset-name-succeed")
+                val result = vault.rename(it)
+                when (result.reason) {
+                    "vault_name_invalid" -> opener.sendLang("vaults-admin-reset-name-invalid")
+                    "vault_already_exists" -> opener.sendLang("vaults-admin-reset-name-existed")
+                    "vault_name_color" -> opener.sendLang("vaults-admin-reset-name-color")
+                    "vault_name_length" -> opener.sendLang("vaults-admin-reset-name-length")
+                    null -> {
+                        opener.sendLang("vaults-admin-reset-name-succeed")
+                        sync {
                             opener.closeInventory()
                             root?.open()
                         }
@@ -94,21 +95,21 @@ class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = 
             opener.closeInventory()
             opener.sendLang("vaults-admin-input-desc")
             opener.nextChat {
+                vault.desc = it
+                vault.updatedAt = System.currentTimeMillis()
+
+                val table = com.faithl.zephyrion.storage.DatabaseConfig.vaultsTable
+                val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
+                table.update(dataSource) {
+                    set("description", vault.desc)
+                    set("updated_at", vault.updatedAt)
+                    where { "id" eq vault.id }
+                }
+
+                opener.sendLang("vaults-admin-reset-desc-succeed")
                 sync {
-                    vault.desc = it
-                    vault.updatedAt = System.currentTimeMillis()
-
-                    val table = com.faithl.zephyrion.storage.DatabaseConfig.vaultsTable
-                    val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
-                    table.update(dataSource) {
-                        set("description", vault.desc)
-                        set("updated_at", vault.updatedAt)
-                        where { "id" eq vault.id }
-                    }
-
-                    opener.sendLang("vaults-admin-reset-desc-succeed")
-                    opener.closeInventory()
-                    root?.open()
+                 opener.closeInventory()
+                 root?.open()
                 }
             }
         }
@@ -126,18 +127,6 @@ class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = 
         }
     }
 
-    fun setReturnItem(menu: Chest) {
-        menu.set('R') {
-            buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = opener.asLangText("vaults-admin-return")
-            }
-        }
-        menu.onClick('R') {
-            opener.closeInventory()
-            root?.open()
-        }
-    }
-
     fun setDeleteItem(menu: Chest) {
         menu.set('E') {
             buildItem(XMaterial.BARRIER) {
@@ -149,7 +138,6 @@ class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = 
             opener.sendLang("vaults-admin-delete-tip")
             opener.nextChat {
                 if (it == "Y") {
-                    // Delete all related data: items, settings, auto_pickups, and vault itself
                     val itemsTable = com.faithl.zephyrion.storage.DatabaseConfig.itemsTable
                     val settingsTable = com.faithl.zephyrion.storage.DatabaseConfig.settingsTable
                     val autoPickupsTable = com.faithl.zephyrion.storage.DatabaseConfig.autoPickupsTable
@@ -157,31 +145,25 @@ class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = 
                     val quotasTable = com.faithl.zephyrion.storage.DatabaseConfig.quotasTable
                     val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
 
-                    // Update user quota
                     val user = com.faithl.zephyrion.api.ZephyrionAPI.getUserData(vault.workspace.owner)
                     user.sizeUsed -= vault.size
 
-                    // Delete items
                     itemsTable.delete(dataSource) {
                         where { "vault_id" eq vault.id }
                     }
 
-                    // Delete settings
                     settingsTable.delete(dataSource) {
                         where { "vault_id" eq vault.id }
                     }
 
-                    // Delete auto pickups
                     autoPickupsTable.delete(dataSource) {
                         where { "vault_id" eq vault.id }
                     }
 
-                    // Delete vault
                     vaultsTable.delete(dataSource) {
                         where { "id" eq vault.id }
                     }
 
-                    // Update quota
                     quotasTable.update(dataSource) {
                         set("size_used", user.sizeUsed)
                         where { "player" eq vault.workspace.owner }
@@ -191,10 +173,20 @@ class AdminVault(override val opener: Player, val vault: Vault, val root: UI? = 
                 } else {
                     opener.sendLang("vaults-admin-delete-canceled")
                 }
-                sync {
-                    root?.open()
-                }
+                sync { root?.open() }
             }
+        }
+    }
+
+    override fun setReturnItem(menu: Chest) {
+        menu.set('R') {
+            buildItem(XMaterial.BARRIER) {
+                name = opener.asLangText("ui-item-name-return")
+            }
+        }
+        menu.onClick('R') {
+            it.clicker.closeInventory()
+            root?.open()
         }
     }
 

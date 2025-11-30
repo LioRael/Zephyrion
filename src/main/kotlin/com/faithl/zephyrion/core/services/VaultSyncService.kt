@@ -1,11 +1,6 @@
 package com.faithl.zephyrion.core.services
 
-import com.faithl.zephyrion.api.events.VaultAddItemEvent
-import com.faithl.zephyrion.api.events.VaultCloseEvent
-import com.faithl.zephyrion.api.events.VaultOpenEvent
-import com.faithl.zephyrion.api.events.VaultRemoveItemEvent
-import com.faithl.zephyrion.api.events.VaultSearchCloseEvent
-import com.faithl.zephyrion.api.events.VaultSearchOpenEvent
+import com.faithl.zephyrion.api.events.*
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.models.WorkspaceType
 import com.faithl.zephyrion.core.ui.vault.VaultUI

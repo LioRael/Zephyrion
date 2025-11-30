@@ -13,15 +13,7 @@ object QuotasTable {
         return when (host) {
             is HostSQL -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQL.BIGINT) {
-                            options(
-                                ColumnOptionSQL.PRIMARY_KEY,
-                                ColumnOptionSQL.AUTO_INCREMENT,
-                                ColumnOptionSQL.UNSIGNED
-                            )
-                        }
-                    }
+                    add { id() }
                     add("player") {
                         type(ColumnTypeSQL.VARCHAR, 36) {
                             options(ColumnOptionSQL.UNIQUE_KEY, ColumnOptionSQL.NOTNULL)
@@ -50,21 +42,14 @@ object QuotasTable {
                     add("unlimited") {
                         type(ColumnTypeSQL.BOOLEAN) {
                             options(ColumnOptionSQL.NOTNULL)
-                            def(false)
+                            def(0)
                         }
                     }
                 }
             }
             is HostSQLite -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQLite.INTEGER) {
-                            options(
-                                ColumnOptionSQLite.PRIMARY_KEY,
-                                ColumnOptionSQLite.AUTOINCREMENT
-                            )
-                        }
-                    }
+                    add { id() }
                     add("player") {
                         type(ColumnTypeSQLite.TEXT) {
                             options(ColumnOptionSQLite.NOTNULL)
@@ -117,15 +102,7 @@ object WorkspacesTable {
         return when (host) {
             is HostSQL -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQL.BIGINT) {
-                            options(
-                                ColumnOptionSQL.PRIMARY_KEY,
-                                ColumnOptionSQL.AUTO_INCREMENT,
-                                ColumnOptionSQL.UNSIGNED
-                            )
-                        }
-                    }
+                    add { id() }
                     add("name") {
                         type(ColumnTypeSQL.VARCHAR, 255) {
                             options(ColumnOptionSQL.NOTNULL)
@@ -163,14 +140,7 @@ object WorkspacesTable {
             }
             is HostSQLite -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQLite.INTEGER) {
-                            options(
-                                ColumnOptionSQLite.PRIMARY_KEY,
-                                ColumnOptionSQLite.AUTOINCREMENT
-                            )
-                        }
-                    }
+                    add { id() }
                     add("name") {
                         type(ColumnTypeSQLite.TEXT) {
                             options(ColumnOptionSQLite.NOTNULL)
@@ -222,15 +192,7 @@ object VaultsTable {
         return when (host) {
             is HostSQL -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQL.BIGINT) {
-                            options(
-                                ColumnOptionSQL.PRIMARY_KEY,
-                                ColumnOptionSQL.AUTO_INCREMENT,
-                                ColumnOptionSQL.UNSIGNED
-                            )
-                        }
-                    }
+                    add { id() }
                     add("name") {
                         type(ColumnTypeSQL.VARCHAR, 255) {
                             options(ColumnOptionSQL.NOTNULL)
@@ -263,14 +225,7 @@ object VaultsTable {
             }
             is HostSQLite -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQLite.INTEGER) {
-                            options(
-                                ColumnOptionSQLite.PRIMARY_KEY,
-                                ColumnOptionSQLite.AUTOINCREMENT
-                            )
-                        }
-                    }
+                    add { id() }
                     add("name") {
                         type(ColumnTypeSQLite.TEXT) {
                             options(ColumnOptionSQLite.NOTNULL)
@@ -317,15 +272,7 @@ object ItemsTable {
         return when (host) {
             is HostSQL -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQL.BIGINT) {
-                            options(
-                                ColumnOptionSQL.PRIMARY_KEY,
-                                ColumnOptionSQL.AUTO_INCREMENT,
-                                ColumnOptionSQL.UNSIGNED
-                            )
-                        }
-                    }
+                    add { id() }
                     add("vault_id") {
                         type(ColumnTypeSQL.INT) {
                             options(ColumnOptionSQL.NOTNULL)
@@ -353,14 +300,7 @@ object ItemsTable {
             }
             is HostSQLite -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQLite.INTEGER) {
-                            options(
-                                ColumnOptionSQLite.PRIMARY_KEY,
-                                ColumnOptionSQLite.AUTOINCREMENT
-                            )
-                        }
-                    }
+                    add { id() }
                     add("vault_id") {
                         type(ColumnTypeSQLite.INTEGER) {
                             options(ColumnOptionSQLite.NOTNULL)
@@ -406,15 +346,7 @@ object SettingsTable {
         return when (host) {
             is HostSQL -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQL.BIGINT) {
-                            options(
-                                ColumnOptionSQL.PRIMARY_KEY,
-                                ColumnOptionSQL.AUTO_INCREMENT,
-                                ColumnOptionSQL.UNSIGNED
-                            )
-                        }
-                    }
+                    add { id() }
                     add("setting") {
                         type(ColumnTypeSQL.VARCHAR, 255) {
                             options(ColumnOptionSQL.NOTNULL)
@@ -444,14 +376,7 @@ object SettingsTable {
             }
             is HostSQLite -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQLite.INTEGER) {
-                            options(
-                                ColumnOptionSQLite.PRIMARY_KEY,
-                                ColumnOptionSQLite.AUTOINCREMENT
-                            )
-                        }
-                    }
+                    add { id() }
                     add("setting") {
                         type(ColumnTypeSQLite.TEXT) {
                             options(ColumnOptionSQLite.NOTNULL)
@@ -500,15 +425,7 @@ object AutoPickupsTable {
         return when (host) {
             is HostSQL -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQL.BIGINT) {
-                            options(
-                                ColumnOptionSQL.PRIMARY_KEY,
-                                ColumnOptionSQL.AUTO_INCREMENT,
-                                ColumnOptionSQL.UNSIGNED
-                            )
-                        }
-                    }
+                    add { id() }
                     add("vault_id") {
                         type(ColumnTypeSQL.INT) {
                             options(ColumnOptionSQL.NOTNULL)
@@ -538,14 +455,7 @@ object AutoPickupsTable {
             }
             is HostSQLite -> {
                 Table(tableName, host) {
-                    add("id") {
-                        type(ColumnTypeSQLite.INTEGER) {
-                            options(
-                                ColumnOptionSQLite.PRIMARY_KEY,
-                                ColumnOptionSQLite.AUTOINCREMENT
-                            )
-                        }
-                    }
+                    add { id() }
                     add("vault_id") {
                         type(ColumnTypeSQLite.INTEGER) {
                             options(ColumnOptionSQLite.NOTNULL)

@@ -4,7 +4,7 @@ import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Workspace
 import com.faithl.zephyrion.core.models.WorkspaceType
 import com.faithl.zephyrion.core.ui.SearchUI
-import com.faithl.zephyrion.core.ui.search.Search
+import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.search.SearchItem
 import com.faithl.zephyrion.core.ui.setLinkedMenuProperties
 import com.faithl.zephyrion.core.ui.setRows6SplitBlock
@@ -12,7 +12,6 @@ import com.faithl.zephyrion.core.ui.vault.ListVaults
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
-import taboolib.common.platform.function.submitAsync
 import taboolib.common.util.sync
 import taboolib.library.xseries.XMaterial
 import taboolib.module.ui.buildMenu
@@ -26,12 +25,9 @@ import taboolib.platform.util.*
  */
 class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = null) : SearchUI() {
 
+    override val root: UI? = null
     val dataOwner: Player = targetPlayer ?: opener
-
     val workspaces = mutableListOf<Workspace>()
-    val searchItems = mutableListOf<SearchItem>()
-    override val params = mutableMapOf<String, String>()
-    val searchUI = Search(opener, searchItems, this)
 
     init {
         addSearchItems("name")
@@ -77,7 +73,7 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
             setElements(this)
             setCreateItem(this)
             setSearchItem(this)
-            setCloseItem(this)
+            setReturnItem(this)
             setPageTurnItems(this)
         }
     }
@@ -164,17 +160,6 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
         }
     }
 
-    fun setCloseItem(menu: PageableChest<Workspace>) {
-        menu.set(53) {
-            buildItem(XMaterial.RED_STAINED_GLASS_PANE) {
-                name = opener.asLangText("workspace-main-close")
-            }
-        }
-        menu.onClick(53) {
-            opener.closeInventory()
-        }
-    }
-
     fun setPageTurnItems(menu: PageableChest<Workspace>) {
         menu.setPreviousPage(48) { _, hasPreviousPage ->
             if (hasPreviousPage) {
@@ -200,17 +185,6 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
         }
     }
 
-    fun setSearchItem(menu: PageableChest<Workspace>) {
-        menu.set(49) {
-            buildItem(XMaterial.COMPASS) {
-                name = opener.asLangText("workspace-main-search")
-            }
-        }
-        menu.onClick(49) {
-            searchUI.open()
-        }
-    }
-
     fun addSearchItems(name: String) {
         searchItems += SearchItem(
             opener.asLangText("workspace-main-search-by-${name}-name"),
@@ -220,9 +194,7 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
             opener.sendLang("workspace-main-search-by-${name}-input")
             opener.nextChat {
                 params[name] = it
-                sync {
-                    searchUI.open()
-                }
+                sync { searchUI.open() }
             }
         }
     }
@@ -242,19 +214,12 @@ class ListWorkspaces(override val opener: Player, val targetPlayer: Player? = nu
             opener.sendLang("no-permission")
             return
         }
-
-        submitAsync {
-            try {
-                search()
-                sync {
-                    opener.openInventory(build())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                sync {
-                    opener.sendLang("ui-load-error")
-                }
-            }
+        try {
+            search()
+            opener.openInventory(build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+            opener.sendLang("ui-load-error")
         }
     }
 
