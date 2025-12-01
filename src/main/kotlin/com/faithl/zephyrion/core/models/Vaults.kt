@@ -1,6 +1,10 @@
 package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.api.ZephyrionAPI
+import com.faithl.zephyrion.core.cache.AutoPickupCache
+import com.faithl.zephyrion.core.cache.ItemCache
+import com.faithl.zephyrion.core.cache.QuotaCache
+import com.faithl.zephyrion.core.cache.VaultCache
 import com.faithl.zephyrion.storage.DatabaseConfig
 import taboolib.module.database.Table
 import java.text.SimpleDateFormat
@@ -18,9 +22,10 @@ data class Vault(
     var size: Int,
     var createdAt: Long,
     var updatedAt: Long
-) {
+) : java.io.Serializable {
 
     companion object {
+        private const val serialVersionUID = 1L
 
         private val table: Table<*, *>
             get() = DatabaseConfig.vaultsTable
@@ -29,63 +34,45 @@ data class Vault(
             get() = DatabaseConfig.dataSource
 
         /**
-         * 根据ID获取保险库
+         * 根据ID获取保险库（使用缓存）
          */
         fun findById(id: Int): Vault? {
-            return table.select(dataSource) {
-                where { "id" eq id }
-            }.firstOrNull {
-                Vault(
-                    id = getInt("id"),
-                    name = getString("name"),
-                    desc = getString("description"),
-                    workspaceId = getInt("workspace_id"),
-                    size = getInt("size"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return VaultCache.getById(id)
         }
 
         /**
          * 获取指定工作空间和名称的保险库
          */
         fun getVault(workspace: Workspace, name: String): Vault? {
-            return table.select(dataSource) {
-                where {
-                    "name" eq name
-                    and { "workspace_id" eq workspace.id }
-                }
-            }.firstOrNull {
-                Vault(
-                    id = getInt("id"),
-                    name = getString("name"),
-                    desc = getString("description"),
-                    workspaceId = getInt("workspace_id"),
-                    size = getInt("size"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return VaultCache.getByWorkspace(workspace).find { it.name == name }
         }
 
         /**
-         * 获取指定工作空间的所有保险库
+         * 获取指定工作空间的所有保险库（使用缓存）
          */
         fun getVaults(workspace: Workspace): List<Vault> {
-            return table.select(dataSource) {
-                where { "workspace_id" eq workspace.id }
-            }.map {
-                Vault(
-                    id = getInt("id"),
-                    name = getString("name"),
-                    desc = getString("description"),
-                    workspaceId = getInt("workspace_id"),
-                    size = getInt("size"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
+            return VaultCache.getByWorkspace(workspace)
+        }
+
+        /**
+         * 创建保险库（数据库操作）
+         */
+        fun create(workspace: Workspace, name: String, desc: String?): Boolean {
+            table.insert(dataSource, "name", "description", "workspace_id", "size", "created_at", "updated_at") {
+                value(
+                    name,
+                    desc,
+                    workspace.id,
+                    0,
+                    System.currentTimeMillis(),
+                    System.currentTimeMillis()
                 )
             }
+
+            // 更新缓存
+            VaultCache.invalidateWorkspaceVaults(workspace.id)
+
+            return true
         }
     }
 
@@ -131,6 +118,9 @@ data class Vault(
             where { "id" eq id }
         }
 
+        user.sizeUsed = newSizeUsed
+        QuotaCache.update(workspace.owner, user)
+        VaultCache.update(this)
         return true
     }
 
@@ -169,6 +159,9 @@ data class Vault(
             where { "id" eq id }
         }
 
+        user.sizeUsed = newSizeUsed
+        QuotaCache.update(workspace.owner, user)
+        VaultCache.update(this)
         return true
     }
 
@@ -212,6 +205,76 @@ data class Vault(
             where { "id" eq id }
         }
 
+        VaultCache.update(this)
         return ZephyrionAPI.Result(true)
+    }
+
+    /**
+     * 更新保险库描述
+     */
+    fun updateDesc(newDesc: String?) {
+        desc = newDesc
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("description", desc)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
+        }
+
+        VaultCache.update(this)
+    }
+
+    /**
+     * 删除保险库及其所有数据
+     */
+    fun delete(): Boolean {
+        val user = ZephyrionAPI.getUserData(workspace.owner)
+        val currentSizeUsed = user.sizeUsed
+        val newSizeUsed = currentSizeUsed - size
+
+        if (newSizeUsed < 0) {
+            return false
+        }
+
+        val quotasTable = DatabaseConfig.quotasTable
+        val itemsTable = DatabaseConfig.itemsTable
+        val settingsTable = DatabaseConfig.settingsTable
+        val autoPickupsTable = DatabaseConfig.autoPickupsTable
+
+        // 删除物品
+        itemsTable.delete(dataSource) {
+            where { "vault_id" eq id }
+        }
+
+        // 删除设置
+        settingsTable.delete(dataSource) {
+            where { "vault_id" eq id }
+        }
+
+        // 删除自动拾取规则
+        autoPickupsTable.delete(dataSource) {
+            where { "vault_id" eq id }
+        }
+
+        // 删除保险库
+        table.delete(dataSource) {
+            where { "id" eq id }
+        }
+
+        // 更新配额
+        quotasTable.update(dataSource) {
+            set("size_used", newSizeUsed)
+            where { "player" eq workspace.owner }
+        }
+
+        // 更新缓存
+        user.sizeUsed = newSizeUsed
+        QuotaCache.update(workspace.owner, user)
+        VaultCache.invalidate(id)
+        AutoPickupCache.invalidate(id)
+        ItemCache.invalidateAll(id)
+
+        return true
     }
 }

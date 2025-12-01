@@ -29,6 +29,21 @@ data class Setting(
 
         private val dataSource
             get() = DatabaseConfig.dataSource
+
+        /**
+         * 创建设置
+         */
+        fun create(vault: Vault, setting: String, value: String) {
+            table.insert(dataSource, "setting", "value", "vault_id", "created_at", "updated_at") {
+                value(
+                    setting,
+                    value,
+                    vault.id,
+                    System.currentTimeMillis(),
+                    System.currentTimeMillis()
+                )
+            }
+        }
     }
 
     /**

@@ -5,9 +5,11 @@ import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.ui.vault.ListVaults
 import com.faithl.zephyrion.core.ui.vault.VaultUI
 import com.faithl.zephyrion.core.ui.workspace.ListWorkspaces
+import com.faithl.zephyrion.storage.cache.CacheConfig
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import org.bukkit.inventory.meta.Damageable
 import taboolib.common.platform.ProxyCommandSender
 import taboolib.common.platform.command.*
 import taboolib.common.platform.function.onlinePlayers
@@ -33,6 +35,7 @@ object ZephyrionCommand {
     @CommandBody(permission = "zephyrion.command.reload")
     val reload = subCommand {
         execute<ProxyCommandSender> { sender, _, _ ->
+            CacheConfig.initialize()
             sender.sendLang("plugin-reload")
         }
     }
@@ -279,14 +282,25 @@ object ZephyrionCommand {
         }
     }
 
-    @CommandBody
-    val bind = subCommand {
-
-    }
-
-    @CommandBody
-    val unbind = subCommand {
-
+    @CommandBody(permission = "zephyrion.command.setdurability")
+    val setdurability = subCommand {
+        dynamic(comment = "durability") {
+            suggestion<CommandSender> { _, _ ->
+                listOf("1", "10", "50", "100")
+            }
+            execute<Player> { sender, _, argument ->
+                val item = sender.inventory.itemInMainHand
+                if (item.type.isAir) return@execute
+                val meta = item.itemMeta
+                if (meta !is Damageable) return@execute
+                val durability = argument.toIntOrNull()
+                if (durability == null || durability < 0) return@execute
+                val maxDurability = item.type.maxDurability.toInt()
+                val damage = maxDurability - durability
+                meta.damage = damage.coerceAtLeast(0)
+                item.itemMeta = meta
+            }
+        }
     }
 
 }

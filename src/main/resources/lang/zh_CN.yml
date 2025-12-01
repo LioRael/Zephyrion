@@ -7,12 +7,12 @@ ui-item-name-return: "&c返回"
 ui-item-name-close: "&c关闭"
 ui-item-name-search: "&b搜索"
 
-independent-workspace: "独立工作空间"
-independent-workspace-desc: "独立工作空间将存在于每位玩家的工作空间列表中，内部仓库物品相互独立"
-public-workspace: "公共工作空间"
-public-workspace-desc: "公共工作空间将存在于空间成员的工作空间列表中，内部仓库物品相互共享"
-private-workspace: "私有工作空间"
-private-workspace-desc: "私有工作空间只存在于自己的工作空间列表中，内部仓库物品仅自己可用"
+independent-workspace: "&b独立工作空间"
+independent-workspace-desc: "&b独立工作空间将存在于每位玩家的工作空间列表中，内部仓库物品相互独立"
+public-workspace: "&b公共工作空间"
+public-workspace-desc: "&b公共工作空间将存在于空间成员的工作空间列表中，内部仓库物品相互共享"
+private-workspace: "&b私有工作空间"
+private-workspace-desc: "&b私有工作空间只存在于自己的工作空间列表中，内部仓库物品仅自己可用"
 
 workspace-main-title: "&b工作空间"
 workspace-main-title-with-search: "&b工作空间 &7(搜索结果)"
@@ -379,3 +379,14 @@ auto-pickup-add-by-lore-desc:
 auto-pickup-add-no-item: "&b[Zephyrion] &c请先放入物品"
 auto-pickup-add-no-lore: "&b[Zephyrion] &c物品没有Lore"
 auto-pickup-create-failed: "&b[Zephyrion] &c规则添加失败"
+
+# 工具自动替换相关
+auto-replace-tool-replaced: "&b[Zephyrion] &a工具已自动替换: {0} (来自仓库: {1})"
+auto-replace-tool-no-replacement: "&b[Zephyrion] &c未找到可替换的工具: {0}"
+
+# 缓存相关
+cache-type-not-set: "&b[Zephyrion] &e未设置缓存类型，默认使用内存缓存"
+cache-type-unsupported: "&b[Zephyrion] &c不支持的缓存类型: {0}，已降级为内存缓存"
+cache-initialized: "&b[Zephyrion] &a缓存初始化完成，当前使用: {0}"
+cache-redis-config-not-found: "&b[Zephyrion] &c未找到Redis缓存配置，已降级为内存缓存"
+cache-redis-init-failed: "&b[Zephyrion] &cRedis缓存初始化失败: {0}，已降级为内存缓存"

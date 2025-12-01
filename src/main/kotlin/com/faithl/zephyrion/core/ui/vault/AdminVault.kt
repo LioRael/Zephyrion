@@ -1,5 +1,6 @@
 package com.faithl.zephyrion.core.ui.vault
 
+import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setSplitBlock
@@ -95,21 +96,11 @@ class AdminVault(override val opener: Player, val vault: Vault, override val roo
             opener.closeInventory()
             opener.sendLang("vaults-admin-input-desc")
             opener.nextChat {
-                vault.desc = it
-                vault.updatedAt = System.currentTimeMillis()
-
-                val table = com.faithl.zephyrion.storage.DatabaseConfig.vaultsTable
-                val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
-                table.update(dataSource) {
-                    set("description", vault.desc)
-                    set("updated_at", vault.updatedAt)
-                    where { "id" eq vault.id }
-                }
-
+                ZephyrionAPI.updateVaultDesc(vault, it)
                 opener.sendLang("vaults-admin-reset-desc-succeed")
                 sync {
-                 opener.closeInventory()
-                 root?.open()
+                    opener.closeInventory()
+                    root?.open()
                 }
             }
         }
@@ -138,37 +129,7 @@ class AdminVault(override val opener: Player, val vault: Vault, override val roo
             opener.sendLang("vaults-admin-delete-tip")
             opener.nextChat {
                 if (it == "Y") {
-                    val itemsTable = com.faithl.zephyrion.storage.DatabaseConfig.itemsTable
-                    val settingsTable = com.faithl.zephyrion.storage.DatabaseConfig.settingsTable
-                    val autoPickupsTable = com.faithl.zephyrion.storage.DatabaseConfig.autoPickupsTable
-                    val vaultsTable = com.faithl.zephyrion.storage.DatabaseConfig.vaultsTable
-                    val quotasTable = com.faithl.zephyrion.storage.DatabaseConfig.quotasTable
-                    val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
-
-                    val user = com.faithl.zephyrion.api.ZephyrionAPI.getUserData(vault.workspace.owner)
-                    user.sizeUsed -= vault.size
-
-                    itemsTable.delete(dataSource) {
-                        where { "vault_id" eq vault.id }
-                    }
-
-                    settingsTable.delete(dataSource) {
-                        where { "vault_id" eq vault.id }
-                    }
-
-                    autoPickupsTable.delete(dataSource) {
-                        where { "vault_id" eq vault.id }
-                    }
-
-                    vaultsTable.delete(dataSource) {
-                        where { "id" eq vault.id }
-                    }
-
-                    quotasTable.update(dataSource) {
-                        set("size_used", user.sizeUsed)
-                        where { "player" eq vault.workspace.owner }
-                    }
-
+                    ZephyrionAPI.deleteVault(vault)
                     opener.sendLang("vaults-admin-delete-succeed")
                 } else {
                     opener.sendLang("vaults-admin-delete-canceled")

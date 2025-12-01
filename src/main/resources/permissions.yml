@@ -1,4 +1,5 @@
 auto-pick-items: zephyrion.auto-pick-items
+auto-replace-tool: zephyrion.auto-replace-tool
 #search-items: zephyrion.search-items
 
 create-public-workspace: zephyrion.create-public-workspace

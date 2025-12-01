@@ -1,6 +1,7 @@
 package com.faithl.zephyrion
 
 import com.faithl.zephyrion.storage.DatabaseConfig
+import com.faithl.zephyrion.storage.cache.CacheConfig
 import taboolib.common.platform.Platform
 import taboolib.common.platform.Plugin
 import taboolib.common.platform.function.console
@@ -28,6 +29,7 @@ object Zephyrion : Plugin() {
         private set
 
     override fun onEnable() {
+        CacheConfig.initialize()
         DatabaseConfig.initialize()
         console().sendLang("plugin-enabled")
     }
@@ -38,6 +40,7 @@ object Zephyrion : Plugin() {
     }
 
     override fun onDisable() {
+        CacheConfig.shutdown()
         console().sendLang("plugin-disabled")
     }
 

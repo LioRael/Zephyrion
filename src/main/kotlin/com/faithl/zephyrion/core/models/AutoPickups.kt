@@ -1,6 +1,7 @@
 package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.api.ZephyrionAPI
+import com.faithl.zephyrion.core.cache.AutoPickupCache
 import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.inventory.ItemStack
 import taboolib.module.database.Table
@@ -24,9 +25,10 @@ data class AutoPickup(
     var vaultId: Int,
     var createdAt: Long,
     var updatedAt: Long
-) {
+) : java.io.Serializable {
 
     companion object {
+        private const val serialVersionUID = 1L
 
         private val table: Table<*, *>
             get() = DatabaseConfig.autoPickupsTable
@@ -35,42 +37,17 @@ data class AutoPickup(
             get() = DatabaseConfig.dataSource
 
         /**
-         * 获取保险库的所有自动拾取规则
+         * 获取保险库的所有自动拾取规则（使用缓存）
          */
         fun getAutoPickups(vault: Vault): List<AutoPickup> {
-            return table.select(dataSource) {
-                where { "vault_id" eq vault.id }
-            }.map {
-                AutoPickup(
-                    id = getInt("id"),
-                    type = AutoPickupType.valueOf(getString("type")),
-                    value = getString("value"),
-                    vaultId = getInt("vault_id"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return AutoPickupCache.get(vault)
         }
 
         /**
          * 获取保险库的指定类型的自动拾取规则
          */
         fun getAutoPickupsByType(vault: Vault, type: AutoPickupType): List<AutoPickup> {
-            return table.select(dataSource) {
-                where {
-                    "vault_id" eq vault.id
-                    and { "type" eq type.name }
-                }
-            }.map {
-                AutoPickup(
-                    id = getInt("id"),
-                    type = AutoPickupType.valueOf(getString("type")),
-                    value = getString("value"),
-                    vaultId = getInt("vault_id"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return AutoPickupCache.get(vault).filter { it.type == type }
         }
 
         /**
@@ -81,13 +58,8 @@ data class AutoPickup(
                 return ZephyrionAPI.Result(false, "auto_pickup_value_empty")
             }
 
-            val existing = table.select(dataSource) {
-                where {
-                    "vault_id" eq vault.id
-                    and { "type" eq type.name }
-                    and { "value" eq value }
-                }
-            }.find()
+            val cachedRules = AutoPickupCache.get(vault)
+            val existing = cachedRules.any { it.type == type && it.value == value }
 
             if (existing) {
                 return ZephyrionAPI.Result(false, "auto_pickup_already_exists")
@@ -102,6 +74,7 @@ data class AutoPickup(
                     System.currentTimeMillis()
                 )
             }
+            AutoPickupCache.invalidate(vault.id)
             return ZephyrionAPI.Result(true)
         }
 
@@ -116,6 +89,7 @@ data class AutoPickup(
                 where { "vault_id" eq vault.id }
             }
 
+            AutoPickupCache.invalidate(vault.id)
             return count
         }
 
@@ -219,6 +193,7 @@ data class AutoPickup(
         table.delete(dataSource) {
             where { "id" eq id }
         }
+        AutoPickupCache.invalidate(vaultId)
         return true
     }
 
@@ -239,6 +214,7 @@ data class AutoPickup(
             where { "id" eq id }
         }
 
+        AutoPickupCache.invalidate(vaultId)
         return ZephyrionAPI.Result(true)
     }
 }

@@ -2,7 +2,6 @@ package com.faithl.zephyrion.api
 
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.core.models.*
-import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -79,42 +78,17 @@ object ZephyrionAPI {
             return Result(false, "workspace_type_invalid")
         }
 
-        val quotasTable = DatabaseConfig.quotasTable
-        val dataSource = DatabaseConfig.dataSource
-
         val ownerData = getUserData(owner)
-        val newUsed = ownerData.workspaceUsed + 1
-
-        if (newUsed > ownerData.workspaceQuotas) {
+        if (ownerData.workspaceUsed + 1 > ownerData.workspaceQuotas) {
             return Result(false, "workspace_quota_exceeded")
         }
 
-        val affected = quotasTable.update(dataSource) {
-            set("workspace_used", newUsed)
-            where {
-                "player" eq owner
-                and { "workspace_used" eq ownerData.workspaceUsed }
-            }
+        val success = Workspace.create(owner, name!!, type, desc)
+        return if (success) {
+            Result(true)
+        } else {
+            Result(false, "workspace_quota_exceeded")
         }
-
-        if (affected == 0) {
-            return Result(false, "workspace_quota_exceeded")
-        }
-
-        val table = DatabaseConfig.workspacesTable
-        table.insert(dataSource, "name", "description", "type", "owner", "members", "created_at", "updated_at") {
-            value(
-                name!!,
-                desc,
-                type.name,
-                owner,
-                owner,
-                System.currentTimeMillis(),
-                System.currentTimeMillis()
-            )
-        }
-
-        return Result(true)
     }
 
     fun getVaults(workspace: Workspace): List<Vault> {
@@ -153,20 +127,8 @@ object ZephyrionAPI {
         if (!result.success) {
             return result
         }
-        val table = DatabaseConfig.vaultsTable
-        val dataSource = DatabaseConfig.dataSource
 
-        table.insert(dataSource, "name", "description", "workspace_id", "size", "created_at", "updated_at") {
-            value(
-                name!!,
-                desc,
-                workspace.id,
-                0,
-                System.currentTimeMillis(),
-                System.currentTimeMillis()
-            )
-        }
-
+        Vault.create(workspace, name!!, desc)
         return Result(true)
     }
 
@@ -195,18 +157,35 @@ object ZephyrionAPI {
     }
 
     fun newSetting(vault: Vault, setting: String, value: String) {
-        val table = DatabaseConfig.settingsTable
-        val dataSource = DatabaseConfig.dataSource
+        Setting.create(vault, setting, value)
+    }
 
-        table.insert(dataSource, "setting", "value", "vault_id", "created_at", "updated_at") {
-            value(
-                setting,
-                value,
-                vault.id,
-                System.currentTimeMillis(),
-                System.currentTimeMillis()
-            )
-        }
+    /**
+     * 更新保险库描述
+     */
+    fun updateVaultDesc(vault: Vault, desc: String?) {
+        vault.updateDesc(desc)
+    }
+
+    /**
+     * 删除保险库
+     */
+    fun deleteVault(vault: Vault): Boolean {
+        return vault.delete()
+    }
+
+    /**
+     * 更新工作空间描述
+     */
+    fun updateWorkspaceDesc(workspace: Workspace, desc: String?) {
+        workspace.updateDesc(desc)
+    }
+
+    /**
+     * 删除工作空间
+     */
+    fun deleteWorkspace(workspace: Workspace) {
+        workspace.delete()
     }
 
     fun isPluginAdmin(opener: Player): Boolean {

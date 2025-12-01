@@ -2,7 +2,9 @@ package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.api.events.VaultAddItemEvent
 import com.faithl.zephyrion.api.events.VaultRemoveItemEvent
+import com.faithl.zephyrion.core.cache.ItemCache
 import com.faithl.zephyrion.storage.DatabaseConfig
+import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.util.io.BukkitObjectInputStream
@@ -24,7 +26,7 @@ data class Item(
     var owner: String?,
     var slot: Int,
     var itemStackSerialized: String
-) {
+) : java.io.Serializable {
 
     var itemStack: ItemStack
         get() = fromByteArray(itemStackSerialized)
@@ -41,75 +43,70 @@ data class Item(
             get() = DatabaseConfig.dataSource
 
         /**
-         * 根据名称搜索物品
+         * 获取保险库所有物品（使用缓存）
          */
-        fun searchItemsByName(vault: Vault, name: String): List<Item> {
-            return table.select(dataSource) {
-                where { "vault_id" eq vault.id }
-            }.map {
-                Item(
-                    id = getInt("id"),
-                    vaultId = getInt("vault_id"),
-                    page = getInt("page"),
-                    owner = getString("owner"),
-                    slot = getInt("slot"),
-                    itemStackSerialized = getString("item_stack")
-                )
-            }.filter { it.getName().contains(name,true) }
-        }
+        private fun getAllItems(vault: Vault, player: Player? = null): List<Item> {
+            val isIndependent = vault.workspace.type == WorkspaceType.INDEPENDENT
+            val ownerUUID = player?.uniqueId?.toString()
 
-        /**
-         * 根据Lore搜索物品
-         */
-        fun searchItemsByLore(vault: Vault, lore: String): List<Item> {
-            return table.select(dataSource) {
-                where { "vault_id" eq vault.id }
-            }.map {
-                Item(
-                    id = getInt("id"),
-                    vaultId = getInt("vault_id"),
-                    page = getInt("page"),
-                    owner = getString("owner"),
-                    slot = getInt("slot"),
-                    itemStackSerialized = getString("item_stack")
-                )
-            }.filter { it.getLore().any { it.contains(lore,true) } }
-        }
+            // 尝试从缓存获取
+            val cached = ItemCache.getAllItems(vault.id, ownerUUID, isIndependent)
+            if (cached != null) {
+                return cached
+            }
 
-        /**
-         * 组合搜索物品（支持名称和Lore的组合搜索）
-         */
-        fun searchItems(vault: Vault, params: Map<String, String>, player: Player? = null): List<Item> {
-            val allItems = if (vault.workspace.type == WorkspaceType.INDEPENDENT && player != null) {
+            // 从数据库加载
+            val items = if (isIndependent && ownerUUID != null) {
                 table.select(dataSource) {
                     where {
                         "vault_id" eq vault.id
-                        and { "owner" eq player.uniqueId.toString() }
+                        and { "owner" eq ownerUUID }
                     }
-                }.map {
-                    Item(
-                        id = getInt("id"),
-                        vaultId = getInt("vault_id"),
-                        page = getInt("page"),
-                        owner = getString("owner"),
-                        slot = getInt("slot"),
-                        itemStackSerialized = getString("item_stack")
-                    )
-                }
+                }.map { mapRowToItem() }
             } else {
                 table.select(dataSource) {
                     where { "vault_id" eq vault.id }
-                }.map {
-                    Item(
-                        id = getInt("id"),
-                        vaultId = getInt("vault_id"),
-                        page = getInt("page"),
-                        owner = getString("owner"),
-                        slot = getInt("slot"),
-                        itemStackSerialized = getString("item_stack")
-                    )
-                }
+                }.map { mapRowToItem() }
             }
+
+            // 更新缓存
+            ItemCache.updateAllItems(vault.id, ownerUUID, isIndependent, items)
+            return items
+        }
+
+        /**
+         * 行映射到 Item 对象
+         */
+        private fun java.sql.ResultSet.mapRowToItem(): Item {
+            return Item(
+                id = getInt("id"),
+                vaultId = getInt("vault_id"),
+                page = getInt("page"),
+                owner = getString("owner"),
+                slot = getInt("slot"),
+                itemStackSerialized = getString("item_stack")
+            )
+        }
+
+        /**
+         * 根据名称搜索物品（使用缓存）
+         */
+        fun searchItemsByName(vault: Vault, name: String): List<Item> {
+            return getAllItems(vault).filter { it.getName().contains(name, true) }
+        }
+
+        /**
+         * 根据Lore搜索物品（使用缓存）
+         */
+        fun searchItemsByLore(vault: Vault, lore: String): List<Item> {
+            return getAllItems(vault).filter { it.getLore().any { line -> line.contains(lore, true) } }
+        }
+
+        /**
+         * 组合搜索物品（支持名称和Lore的组合搜索，使用缓存）
+         */
+        fun searchItems(vault: Vault, params: Map<String, String>, player: Player? = null): List<Item> {
+            val allItems = getAllItems(vault, player)
 
             return allItems.filter { item ->
                 val nameMatch = params["name"]?.let { name ->
@@ -125,95 +122,85 @@ data class Item(
         }
 
         /**
-         * 获取指定页的物品
+         * 获取指定页的物品（使用缓存）
          */
         fun getItems(vault: Vault, page: Int, player: Player): List<Item> {
-            return if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+            val isIndependent = vault.workspace.type == WorkspaceType.INDEPENDENT
+            val ownerUUID = player.uniqueId.toString()
+
+            // 尝试从缓存获取
+            val cached = ItemCache.getPageItems(vault.id, page, ownerUUID, isIndependent)
+            if (cached != null) {
+                return cached
+            }
+
+            // 从数据库加载
+            val items = if (isIndependent) {
                 table.select(dataSource) {
                     where {
                         "vault_id" eq vault.id
                         and { "page" eq page }
-                        and { "owner" eq player.uniqueId.toString() }
+                        and { "owner" eq ownerUUID }
                     }
-                }.map {
-                    Item(
-                        id = getInt("id"),
-                        vaultId = getInt("vault_id"),
-                        page = getInt("page"),
-                        owner = getString("owner"),
-                        slot = getInt("slot"),
-                        itemStackSerialized = getString("item_stack")
-                    )
-                }
+                }.map { mapRowToItem() }
             } else {
                 table.select(dataSource) {
                     where {
                         "vault_id" eq vault.id
                         and { "page" eq page }
                     }
-                }.map {
-                    Item(
-                        id = getInt("id"),
-                        vaultId = getInt("vault_id"),
-                        page = getInt("page"),
-                        owner = getString("owner"),
-                        slot = getInt("slot"),
-                        itemStackSerialized = getString("item_stack")
-                    )
-                }
+                }.map { mapRowToItem() }
             }
+
+            // 更新缓存
+            ItemCache.updatePageItems(vault.id, page, ownerUUID, isIndependent, items)
+            return items
         }
 
         /**
-         * 设置物品
+         * 设置物品（优化：使用 DELETE + INSERT 替代 SELECT + UPDATE/INSERT）
          */
         fun setItem(vault: Vault, page: Int, slot: Int, itemStack: ItemStack, player: Player? = null) {
-            val existing = if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
-                table.select(dataSource) {
-                    where {
-                        "vault_id" eq vault.id
-                        and { "page" eq page }
-                        and { "slot" eq slot }
-                        and { "owner" eq player!!.uniqueId.toString() }
-                    }
-                }.find()
-            } else {
-                table.select(dataSource) {
-                    where {
-                        "vault_id" eq vault.id
-                        and { "page" eq page }
-                        and { "slot" eq slot }
-                    }
-                }.find()
-            }
-
+            val isIndependent = vault.workspace.type == WorkspaceType.INDEPENDENT
+            val ownerUUID = if (isIndependent) player!!.uniqueId.toString() else null
             val itemBase64 = itemStack.toBase64()
 
-            if (!existing) {
-                // 插入新记录
-                table.insert(dataSource, "vault_id", "page", "owner", "slot", "item_stack") {
-                    value(
-                        vault.id,
-                        page,
-                        if (vault.workspace.type == WorkspaceType.INDEPENDENT) player!!.uniqueId.toString() else null,
-                        slot,
-                        itemBase64
-                    )
-                }
-            } else {
-                // 更新现有记录
-                table.update(dataSource) {
-                    set("item_stack", itemBase64)
+            // 先删除旧记录（如果存在）
+            if (isIndependent) {
+                table.delete(dataSource) {
                     where {
                         "vault_id" eq vault.id
-                        "page" eq page
-                        "slot" eq slot
-                        if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
-                            and { "owner" eq player!!.uniqueId.toString() }
-                        }
+                        and { "page" eq page }
+                        and { "slot" eq slot }
+                        and { "owner" eq ownerUUID!! }
+                    }
+                }
+            } else {
+                table.delete(dataSource) {
+                    where {
+                        "vault_id" eq vault.id
+                        and { "page" eq page }
+                        and { "slot" eq slot }
                     }
                 }
             }
+
+            // 插入新记录
+            table.insert(dataSource, "vault_id", "page", "owner", "slot", "item_stack") {
+                value(vault.id, page, ownerUUID, slot, itemBase64)
+            }
+
+            // 写时更新缓存（而非失效）
+            val newItem = Item(
+                id = 0,
+                vaultId = vault.id,
+                page = page,
+                owner = ownerUUID,
+                slot = slot,
+                itemStackSerialized = itemBase64
+            )
+            ItemCache.addOrUpdate(vault.id, page, slot, ownerUUID, isIndependent, newItem)
+
             VaultAddItemEvent(vault, page, slot, itemStack, player).call()
         }
 
@@ -221,13 +208,16 @@ data class Item(
          * 删除物品
          */
         fun removeItem(vault: Vault, page: Int, slot: Int, player: Player? = null) {
-            if (vault.workspace.type == WorkspaceType.INDEPENDENT) {
+            val isIndependent = vault.workspace.type == WorkspaceType.INDEPENDENT
+            val ownerUUID = if (isIndependent) player!!.uniqueId.toString() else null
+
+            if (isIndependent) {
                 table.delete(dataSource) {
                     where {
                         "vault_id" eq vault.id
                         and { "page" eq page }
                         and { "slot" eq slot }
-                        and { "owner" eq player!!.uniqueId.toString() }
+                        and { "owner" eq ownerUUID!! }
                     }
                 }
             } else {
@@ -239,7 +229,20 @@ data class Item(
                     }
                 }
             }
+
+            // 写时更新缓存（而非失效）
+            ItemCache.remove(vault.id, page, slot, ownerUUID, isIndependent)
+
             VaultRemoveItemEvent(vault, page, slot, player).call()
+        }
+
+        /**
+         * 获取保险库中匹配指定材料类型的物品（使用缓存）
+         */
+        fun getItemsByMaterials(vault: Vault, materials: Set<Material>, player: Player? = null): List<Item> {
+            return getAllItems(vault, player)
+                .filter { materials.contains(it.itemStack.type) }
+                .sortedWith(compareBy({ it.page }, { it.slot }))
         }
 
         private fun toBase64(itemStack: ItemStack): String {

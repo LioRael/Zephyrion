@@ -377,3 +377,14 @@ auto-pickup-add-by-lore-desc:
 auto-pickup-add-no-item: "&b[Zephyrion] &cPlease place an item first"
 auto-pickup-add-no-lore: "&b[Zephyrion] &cItem has no lore"
 auto-pickup-create-failed: "&b[Zephyrion] &cFailed to add rule"
+
+# Auto Replace Tool related
+auto-replace-tool-replaced: "&b[Zephyrion] &aTool auto replaced: {0} (from vault: {1})"
+auto-replace-tool-no-replacement: "&b[Zephyrion] &cNo replacement tool found: {0}"
+
+# Cache related
+cache-type-not-set: "&b[Zephyrion] &eCache type not set, using memory cache by default"
+cache-type-unsupported: "&b[Zephyrion] &cUnsupported cache type: {0}, falling back to memory cache"
+cache-initialized: "&b[Zephyrion] &aCache initialized with type: {0}"
+cache-redis-config-not-found: "&b[Zephyrion] &cRedis cache configuration not found, falling back to memory cache"
+cache-redis-init-failed: "&b[Zephyrion] &cFailed to initialize Redis cache: {0}, falling back to memory cache"

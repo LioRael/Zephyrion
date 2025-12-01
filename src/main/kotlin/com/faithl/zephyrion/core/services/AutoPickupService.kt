@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 object AutoPickupService {
 
+    // 玩家有效保险库缓存（有自动拾取规则的保险库）
     private val playerVaultCache = ConcurrentHashMap<String, List<Vault>>()
 
     init {
@@ -79,13 +80,17 @@ object AutoPickupService {
         }
 
         val workspaces = ZephyrionAPI.getJoinedWorkspaces(player)
-        val result = mutableListOf<Vault>()
+        val allVaults = mutableListOf<Vault>()
 
         for (workspace in workspaces) {
-            result.addAll(ZephyrionAPI.getVaults(workspace))
+            allVaults.addAll(ZephyrionAPI.getVaults(workspace))
         }
-        val vaults = result.filter { vault ->
-            AutoPickup.getAutoPickups(vault).isNotEmpty()
+
+        // 批量加载所有保险库的自动拾取规则
+        val autoPickupMap = com.faithl.zephyrion.core.cache.AutoPickupCache.batchLoad(allVaults)
+        
+        val vaults = allVaults.filter { vault ->
+            autoPickupMap[vault.id]?.isNotEmpty() == true
         }
 
         playerVaultCache[playerId] = vaults
@@ -107,41 +112,10 @@ object AutoPickupService {
         }
 
         val maxPage = vault.getMaxPage()
-        val playerUuid = player.uniqueId.toString()
         val isIndependent = vault.workspace.type == WorkspaceType.INDEPENDENT
-        val table = com.faithl.zephyrion.storage.DatabaseConfig.itemsTable
-        val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
 
-        val allExistingItems = if (isIndependent) {
-            table.select(dataSource) {
-                where {
-                    "vault_id" eq vault.id
-                    and { "owner" eq playerUuid }
-                }
-            }.map {
-                Item(
-                    id = getInt("id"),
-                    vaultId = getInt("vault_id"),
-                    page = getInt("page"),
-                    owner = getString("owner"),
-                    slot = getInt("slot"),
-                    itemStackSerialized = getString("item_stack")
-                )
-            }
-        } else {
-            table.select(dataSource) {
-                where { "vault_id" eq vault.id }
-            }.map {
-                Item(
-                    id = getInt("id"),
-                    vaultId = getInt("vault_id"),
-                    page = getInt("page"),
-                    owner = getString("owner"),
-                    slot = getInt("slot"),
-                    itemStackSerialized = getString("item_stack")
-                )
-            }
-        }
+        // 获取所有物品（通过缓存）
+        val allExistingItems = Item.searchItems(vault, emptyMap(), if (isIndependent) player else null)
 
         val usedSlotsByPage = allExistingItems.groupBy { it.page }
             .mapValues { (_, items) -> items.map { it.slot }.toSet() }

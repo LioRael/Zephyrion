@@ -23,6 +23,7 @@ taboolib {
             CommandHelper,
             Database,
             DatabasePlayer,
+            LettuceRedis,
             I18n,
             Kether,
             MinecraftChat,
@@ -51,6 +52,7 @@ dependencies {
     compileOnly("ink.ptms.core:v12004:12004:mapped")
     compileOnly("ink.ptms:nms-all:1.0.0")
 
+    compileOnly("io.lettuce:lettuce-core:6.6.0.RELEASE")
     compileOnly("com.google.code.gson:gson:2.10")
 
     compileOnly(kotlin("stdlib"))

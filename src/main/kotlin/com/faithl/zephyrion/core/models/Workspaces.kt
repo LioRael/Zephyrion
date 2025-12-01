@@ -2,6 +2,9 @@ package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
+import com.faithl.zephyrion.core.cache.QuotaCache
+import com.faithl.zephyrion.core.cache.VaultCache
+import com.faithl.zephyrion.core.cache.WorkspaceCache
 import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer
@@ -24,9 +27,10 @@ data class Workspace(
     var members: String,
     var createdAt: Long,
     var updatedAt: Long
-) {
+) : java.io.Serializable {
 
     companion object {
+        private const val serialVersionUID = 1L
 
         private val table: Table<*, *>
             get() = DatabaseConfig.workspacesTable
@@ -63,59 +67,20 @@ data class Workspace(
         }
 
         fun findById(id: Int): Workspace? {
-            return table.select(dataSource) {
-                where { "id" eq id }
-            }.firstOrNull {
-                Workspace(
-                    id = getInt("id"),
-                    name = getString("name"),
-                    desc = getString("description"),
-                    type = WorkspaceType.valueOf(getString("type")),
-                    owner = getString("owner"),
-                    members = getString("members"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return WorkspaceCache.getById(id)
         }
 
         fun getIndependentWorkspace(): Workspace? {
-            return table.select(dataSource) {
-                where { "name" eq "Independent" }
-            }.firstOrNull {
-                Workspace(
-                    id = getInt("id"),
-                    name = getString("name"),
-                    desc = getString("description"),
-                    type = WorkspaceType.valueOf(getString("type")),
-                    owner = getString("owner"),
-                    members = getString("members"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return WorkspaceCache.getIndependent()
         }
 
         fun getJoinedWorkspaces(player: Player): List<Workspace> {
-            val playerUUID = player.uniqueId.toString()
-            return table.select(dataSource) {
-                where { "members" like "%$playerUUID%" }
-            }.map {
-                Workspace(
-                    id = getInt("id"),
-                    name = getString("name"),
-                    desc = getString("description"),
-                    type = WorkspaceType.valueOf(getString("type")),
-                    owner = getString("owner"),
-                    members = getString("members"),
-                    createdAt = getLong("created_at"),
-                    updatedAt = getLong("updated_at")
-                )
-            }
+            return WorkspaceCache.getJoinedWorkspaces(player)
         }
 
         fun getWorkspace(player: String, name: String): Workspace? {
-            return table.select(dataSource) {
+            // 从数据库查询
+            val workspace = table.select(dataSource) {
                 where {
                     "members" like "%$player%"
                     and { "name" eq name }
@@ -132,6 +97,56 @@ data class Workspace(
                     updatedAt = getLong("updated_at")
                 )
             }
+
+            // 更新缓存
+            workspace?.let { WorkspaceCache.update(it) }
+            return workspace
+        }
+
+        /**
+         * 创建工作空间（数据库操作）
+         */
+        fun create(owner: String, name: String, type: WorkspaceType, desc: String?): Boolean {
+            val quotasTable = DatabaseConfig.quotasTable
+            val ownerData = Quota.getUser(owner)
+            val newUsed = ownerData.workspaceUsed + 1
+
+            if (newUsed > ownerData.workspaceQuotas) {
+                return false
+            }
+
+            // 乐观锁更新配额
+            val affected = quotasTable.update(dataSource) {
+                set("workspace_used", newUsed)
+                where {
+                    "player" eq owner
+                    and { "workspace_used" eq ownerData.workspaceUsed }
+                }
+            }
+
+            if (affected == 0) {
+                return false
+            }
+
+            // 插入工作空间
+            table.insert(dataSource, "name", "description", "type", "owner", "members", "created_at", "updated_at") {
+                value(
+                    name,
+                    desc,
+                    type.name,
+                    owner,
+                    owner,
+                    System.currentTimeMillis(),
+                    System.currentTimeMillis()
+                )
+            }
+
+            // 更新缓存
+            ownerData.workspaceUsed = newUsed
+            QuotaCache.update(owner, ownerData)
+            WorkspaceCache.invalidatePlayerWorkspaces(owner)
+
+            return true
         }
 
         fun addMember(workspace: Workspace, player: Player): Boolean {
@@ -147,6 +162,8 @@ data class Workspace(
                 set("updated_at", workspace.updatedAt)
                 where { "id" eq workspace.id }
             }
+            WorkspaceCache.update(workspace)
+            WorkspaceCache.invalidatePlayerWorkspaces(player.uniqueId.toString())
             return true
         }
 
@@ -167,6 +184,8 @@ data class Workspace(
                 set("updated_at", workspace.updatedAt)
                 where { "id" eq workspace.id }
             }
+            WorkspaceCache.update(workspace)
+            WorkspaceCache.invalidatePlayerWorkspaces(player.uniqueId.toString())
             return true
         }
     }
@@ -185,7 +204,23 @@ data class Workspace(
             set("updated_at", updatedAt)
             where { "id" eq id }
         }
+        WorkspaceCache.update(this)
         return ZephyrionAPI.Result(true)
+    }
+
+    /**
+     * 更新工作空间描述
+     */
+    fun updateDesc(newDesc: String?) {
+        desc = newDesc
+        updatedAt = System.currentTimeMillis()
+
+        table.update(dataSource) {
+            set("description", desc)
+            set("updated_at", updatedAt)
+            where { "id" eq id }
+        }
+        WorkspaceCache.update(this)
     }
 
     fun getCreatedAt(): String {
@@ -254,6 +289,10 @@ data class Workspace(
         table.delete(dataSource) {
             where { "id" eq id }
         }
+        
+        WorkspaceCache.invalidate(id)
+        VaultCache.invalidateWorkspaceVaults(id)
+        QuotaCache.invalidate(owner)
     }
 
     /**

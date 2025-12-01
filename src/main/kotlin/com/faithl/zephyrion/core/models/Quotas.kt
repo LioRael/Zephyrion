@@ -1,6 +1,7 @@
 package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.Zephyrion
+import com.faithl.zephyrion.core.cache.QuotaCache
 import com.faithl.zephyrion.storage.DatabaseConfig
 import org.bukkit.Bukkit
 import taboolib.module.database.HostSQL
@@ -19,9 +20,10 @@ data class Quota(
     var sizeQuotas: Int,
     var sizeUsed: Int,
     var unlimited: Boolean
-) {
+) : java.io.Serializable {
 
     companion object {
+        private const val serialVersionUID = 1L
 
         private val table: Table<*, *>
             get() = DatabaseConfig.quotasTable
@@ -30,52 +32,13 @@ data class Quota(
             get() = DatabaseConfig.dataSource
 
         /**
-         * 获取用户配额数据
+         * 获取用户配额数据（使用缓存）
          * 如果不存在则创建,并根据权限组设置配额
          */
         fun getUser(playerUniqueId: String): Quota {
-            // 先查询数据库
-            val existing = table.select(dataSource) {
-                where { "player" eq playerUniqueId }
-            }.firstOrNull {
-                Quota(
-                    id = getInt("id"),
-                    player = getString("player"),
-                    workspaceQuotas = getInt("workspace_quotas"),
-                    workspaceUsed = getInt("workspace_used"),
-                    sizeQuotas = getInt("size_quotas"),
-                    sizeUsed = getInt("size_used"),
-                    unlimited = when (DatabaseConfig.host) {
-                        is HostSQL -> getBoolean("unlimited")
-                        is HostSQLite -> getInt("unlimited") != 0
-                        else -> false
-                    }
-                )
-            }
-
-            // 如果存在,更新配额(根据权限组)
-            if (existing != null) {
-                updateQuotasByPermission(existing, playerUniqueId)
-                return existing
-            }
-
-            // 不存在则创建
-            val defaultWorkspace = Zephyrion.settings.getInt("user.default-quotas.workspace")
-            val defaultSize = Zephyrion.settings.getInt("user.default-quotas.size")
-            val defaultUnlimited = Zephyrion.settings.getBoolean("user.default-quotas.unlimited")
-
-            table.insert(dataSource, "player", "workspace_quotas", "workspace_used", "size_quotas", "size_used", "unlimited") {
-                value(
-                    playerUniqueId,
-                    defaultWorkspace,
-                    0,
-                    defaultSize,
-                    0,
-                    if (DatabaseConfig.host is HostSQLite) (if (defaultUnlimited) 1 else 0) else defaultUnlimited
-                )
-            }
-
-            return getUser(playerUniqueId)
+            val quota = QuotaCache.get(playerUniqueId)
+            updateQuotasByPermission(quota, playerUniqueId)
+            return quota
         }
 
         /**
@@ -126,6 +89,7 @@ data class Quota(
                 set("workspace_quotas", quota)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -137,11 +101,13 @@ data class Quota(
 
             val userData = getUser(playerUniqueId)
             val newQuota = userData.workspaceQuotas + amount
+            userData.workspaceQuotas = newQuota
 
             table.update(dataSource) {
                 set("workspace_quotas", newQuota)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -155,11 +121,13 @@ data class Quota(
             if (userData.workspaceQuotas - amount < userData.workspaceUsed) {
                 return false
             }
+            userData.workspaceQuotas = userData.workspaceQuotas - amount
 
             table.update(dataSource) {
-                set("workspace_quotas", userData.workspaceQuotas - amount)
+                set("workspace_quotas", userData.workspaceQuotas)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -176,6 +144,7 @@ data class Quota(
                 set("size_quotas", quota)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -187,11 +156,13 @@ data class Quota(
 
             val userData = getUser(playerUniqueId)
             val newQuota = userData.sizeQuotas + amount
+            userData.sizeQuotas = newQuota
 
             table.update(dataSource) {
                 set("size_quotas", newQuota)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -205,11 +176,13 @@ data class Quota(
             if (userData.sizeQuotas - amount < userData.sizeUsed) {
                 return false
             }
+            userData.sizeQuotas = userData.sizeQuotas - amount
 
             table.update(dataSource) {
-                set("size_quotas", userData.sizeQuotas - amount)
+                set("size_quotas", userData.sizeQuotas)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -224,6 +197,7 @@ data class Quota(
                 set("unlimited", if (DatabaseConfig.host is HostSQLite) (if (unlimited) 1 else 0) else unlimited)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.update(playerUniqueId, userData)
             return true
         }
 
@@ -241,6 +215,7 @@ data class Quota(
                 set("unlimited", if (DatabaseConfig.host is HostSQLite) (if (defaultUnlimited) 1 else 0) else defaultUnlimited)
                 where { "player" eq playerUniqueId }
             }
+            QuotaCache.invalidate(playerUniqueId)
             return true
         }
     }

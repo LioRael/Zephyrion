@@ -1,5 +1,6 @@
 package com.faithl.zephyrion.core.ui.workspace
 
+import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Workspace
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.setSplitBlock
@@ -105,17 +106,7 @@ class AdminWorkspace(override val opener: Player, val workspace: Workspace,overr
             opener.closeInventory()
             opener.sendLang("workspace-admin-input-desc")
             opener.nextChat {
-                workspace.desc = it
-                workspace.updatedAt = System.currentTimeMillis()
-
-                val table = com.faithl.zephyrion.storage.DatabaseConfig.workspacesTable
-                val dataSource = com.faithl.zephyrion.storage.DatabaseConfig.dataSource
-                table.update(dataSource) {
-                    set("description", workspace.desc)
-                    set("updated_at", workspace.updatedAt)
-                    where { "id" eq workspace.id }
-                }
-
+                ZephyrionAPI.updateWorkspaceDesc(workspace, it)
                 opener.sendLang("workspace-admin-reset-desc-succeed")
                 sync { open() }
             }
