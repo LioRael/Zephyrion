@@ -205,9 +205,6 @@ vaults-admin-info-desc:
   - "&7描述: {2}"
   - "&7创建时间: {3}"
   - "&7更新时间: {4}"
-vaults-admin-auto-pickup: "&b自动拾取规则"
-vaults-admin-auto-pickup-desc:
-  - "&7点击管理自动拾取规则"
 vaults-admin-delete: "&c删除仓库"
 vaults-admin-delete-tip: "&b[Zephyrion] &c确定要删除仓库吗? &a输入 &c&lY &a确认"
 vaults-admin-delete-succeed: "&b[Zephyrion] &a删除成功"
@@ -390,3 +387,27 @@ cache-type-unsupported: "&b[Zephyrion] &c不支持的缓存类型: {0}，已降�
 cache-initialized: "&b[Zephyrion] &a缓存初始化完成，当前使用: {0}"
 cache-redis-config-not-found: "&b[Zephyrion] &c未找到Redis缓存配置，已降级为内存缓存"
 cache-redis-init-failed: "&b[Zephyrion] &cRedis缓存初始化失败: {0}，已降级为内存缓存"
+
+# 仓库设置相关
+vault-main-settings: "&b设置"
+vault-main-settings-desc:
+  - "&7点击打开仓库设置"
+vault-settings-title: "&b仓库设置: {0}"
+vault-settings-auto-pickup-name: "&b自动拾取"
+vault-settings-auto-pickup-func-desc:
+  - "&7自动将符合规则的掉落物"
+  - "&7存入此仓库"
+vault-settings-auto-pickup-status:
+  - "&7拾取规则数: &a{0}"
+  - "&7不拾取规则数: &c{1}"
+  - "&e点击管理规则"
+vault-settings-auto-replace-name: "&b自动替换"
+vault-settings-auto-replace-func-desc:
+  - "&7工具损坏时自动从"
+  - "&7此仓库补充同类工具"
+vault-settings-auto-replace-enabled:
+  - "&7状态: &a已开启"
+  - "&e点击关闭"
+vault-settings-auto-replace-disabled:
+  - "&7状态: &c已关闭"
+  - "&e点击开启"

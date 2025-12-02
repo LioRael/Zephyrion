@@ -336,10 +336,6 @@ object ItemsTable {
  */
 object SettingsTable {
 
-    enum class SettingType {
-        AUTO_PICKUP
-    }
-
     fun createTable(host: Host<*>): Table<*, *> {
         val tableName = DatabaseConfig.getTableName("settings")
 
@@ -359,6 +355,11 @@ object SettingsTable {
                     }
                     add("vault_id") {
                         type(ColumnTypeSQL.INT) {
+                            options(ColumnOptionSQL.NOTNULL)
+                        }
+                    }
+                    add("owner") {
+                        type(ColumnTypeSQL.VARCHAR, 36) {
                             options(ColumnOptionSQL.NOTNULL)
                         }
                     }
@@ -389,6 +390,11 @@ object SettingsTable {
                     }
                     add("vault_id") {
                         type(ColumnTypeSQLite.INTEGER) {
+                            options(ColumnOptionSQLite.NOTNULL)
+                        }
+                    }
+                    add("owner") {
+                        type(ColumnTypeSQLite.TEXT) {
                             options(ColumnOptionSQLite.NOTNULL)
                         }
                     }
@@ -414,11 +420,6 @@ object SettingsTable {
  */
 object AutoPickupsTable {
 
-    enum class Type {
-        ITEM_PICKUP,
-        ITEM_NOT_PICKUP
-    }
-
     fun createTable(host: Host<*>): Table<*, *> {
         val tableName = DatabaseConfig.getTableName("auto_pickups")
 
@@ -438,6 +439,11 @@ object AutoPickupsTable {
                     }
                     add("value") {
                         type(ColumnTypeSQL.VARCHAR, 255) {
+                            options(ColumnOptionSQL.NOTNULL)
+                        }
+                    }
+                    add("owner") {
+                        type(ColumnTypeSQL.VARCHAR, 36) {
                             options(ColumnOptionSQL.NOTNULL)
                         }
                     }
@@ -467,6 +473,11 @@ object AutoPickupsTable {
                         }
                     }
                     add("value") {
+                        type(ColumnTypeSQLite.TEXT) {
+                            options(ColumnOptionSQLite.NOTNULL)
+                        }
+                    }
+                    add("owner") {
                         type(ColumnTypeSQLite.TEXT) {
                             options(ColumnOptionSQLite.NOTNULL)
                         }

@@ -31,7 +31,7 @@ object CacheService {
             workspaces.forEach { workspace ->
                 val vaults = VaultCache.getByWorkspace(workspace)
                 vaults.forEach { vault ->
-                    AutoPickupCache.get(vault)
+                    AutoPickupCache.get(vault,player.uniqueId.toString())
                 }
             }
         }

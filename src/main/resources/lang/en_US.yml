@@ -203,9 +203,6 @@ vaults-admin-info-desc:
   - "&7Description: {2}"
   - "&7Created: {3}"
   - "&7Updated: {4}"
-vaults-admin-auto-pickup: "&bAuto Pickup Rules"
-vaults-admin-auto-pickup-desc:
-  - "&7Click to manage auto pickup rules"
 vaults-admin-delete: "&cDelete Vault"
 vaults-admin-delete-tip: "&b[Zephyrion] &cAre you sure you want to delete the vault? &aType &c&lY &ato confirm"
 vaults-admin-delete-succeed: "&b[Zephyrion] &aDeleted successfully"
@@ -388,3 +385,27 @@ cache-type-unsupported: "&b[Zephyrion] &cUnsupported cache type: {0}, falling ba
 cache-initialized: "&b[Zephyrion] &aCache initialized with type: {0}"
 cache-redis-config-not-found: "&b[Zephyrion] &cRedis cache configuration not found, falling back to memory cache"
 cache-redis-init-failed: "&b[Zephyrion] &cFailed to initialize Redis cache: {0}, falling back to memory cache"
+
+# Vault Settings related
+vault-main-settings: "&bSettings"
+vault-main-settings-desc:
+  - "&7Click to open vault settings"
+vault-settings-title: "&bVault Settings: {0}"
+vault-settings-auto-pickup-name: "&bAuto Pickup"
+vault-settings-auto-pickup-func-desc:
+  - "&7Automatically store dropped items"
+  - "&7matching rules into this vault"
+vault-settings-auto-pickup-status:
+  - "&7Pickup rules: &a{0}"
+  - "&7No-pickup rules: &c{1}"
+  - "&eClick to manage rules"
+vault-settings-auto-replace-name: "&bAuto Replace"
+vault-settings-auto-replace-func-desc:
+  - "&7Automatically replenish tools"
+  - "&7from this vault when broken"
+vault-settings-auto-replace-enabled:
+  - "&7Status: &aEnabled"
+  - "&eClick to disable"
+vault-settings-auto-replace-disabled:
+  - "&7Status: &cDisabled"
+  - "&eClick to enable"

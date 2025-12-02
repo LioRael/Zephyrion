@@ -272,6 +272,11 @@ data class Workspace(
             return
         }
 
+        val vaults = Vault.getVaults(this)
+        for (vault in vaults) {
+            vault.delete()
+        }
+
         val quotasTable = DatabaseConfig.quotasTable
 
         val affected = quotasTable.update(dataSource) {

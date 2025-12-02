@@ -23,7 +23,6 @@ class AdminVault(override val opener: Player, val vault: Vault, override val roo
             setSplitBlock(this)
             setNameItem(this)
             setDescItem(this)
-            setAutoPickupItem(this)
             setReturnItem(this)
             setDeleteItem(this)
         }
@@ -103,18 +102,6 @@ class AdminVault(override val opener: Player, val vault: Vault, override val roo
                     root?.open()
                 }
             }
-        }
-    }
-
-    fun setAutoPickupItem(menu: Chest) {
-        menu.set('A') {
-            buildItem(XMaterial.HOPPER) {
-                name = opener.asLangText("vaults-admin-auto-pickup")
-                lore += opener.asLangTextList("vaults-admin-auto-pickup-desc")
-            }
-        }
-        menu.onClick('A') {
-            ListAutoPickups(opener, vault, this).open()
         }
     }
 

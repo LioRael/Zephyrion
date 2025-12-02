@@ -214,7 +214,7 @@ class AddAutoPickup(
     }
 
     private fun addRule(ruleValue: String, inventory: Inventory) {
-        val result = ZephyrionAPI.createAutoPickup(vault, selectedType, ruleValue)
+        val result = ZephyrionAPI.createAutoPickup(vault, selectedType, ruleValue, opener.uniqueId.toString())
         if (result.success) {
             opener.sendLang("auto-pickup-create-succeed")
             AutoPickupService.invalidateAllCache()

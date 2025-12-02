@@ -45,7 +45,7 @@ object AutoPickupService {
         val player = event.entity as Player
         val itemStack = event.item.itemStack
 
-        val permission = Zephyrion.permissions.getString("auto-pick-items") ?: "zephyrion.auto-pick-items"
+        val permission = Zephyrion.permissions.getString("vault.setting.auto-pick") ?: "zephyrion.vault.setting.auto-pick"
         if (!player.hasPermission(permission) && !ZephyrionAPI.isPluginAdmin(player)) {
             return
         }
@@ -55,8 +55,9 @@ object AutoPickupService {
             return
         }
 
+        val playerId = player.uniqueId.toString()
         for (vault in vaultRules) {
-            val shouldPickup = com.faithl.zephyrion.core.models.AutoPickup.shouldAutoPickup(itemStack, vault)
+            val shouldPickup = com.faithl.zephyrion.core.models.AutoPickup.shouldAutoPickup(itemStack, vault, playerId)
             if (shouldPickup == true) {
                 val result = storeItemInVault(vault, itemStack, player)
                 if (result) {
@@ -86,8 +87,8 @@ object AutoPickupService {
             allVaults.addAll(ZephyrionAPI.getVaults(workspace))
         }
 
-        // 批量加载所有保险库的自动拾取规则
-        val autoPickupMap = com.faithl.zephyrion.core.cache.AutoPickupCache.batchLoad(allVaults)
+        // 批量加载所有保险库的自动拾取规则（按玩家 owner 过滤）
+        val autoPickupMap = com.faithl.zephyrion.core.cache.AutoPickupCache.batchLoad(allVaults, playerId)
         
         val vaults = allVaults.filter { vault ->
             autoPickupMap[vault.id]?.isNotEmpty() == true

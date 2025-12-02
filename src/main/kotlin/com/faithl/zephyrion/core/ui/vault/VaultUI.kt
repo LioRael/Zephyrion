@@ -8,10 +8,13 @@ import com.faithl.zephyrion.api.events.VaultSearchOpenEvent
 import com.faithl.zephyrion.core.models.Item
 import com.faithl.zephyrion.core.models.Vault
 import com.faithl.zephyrion.core.services.VaultSyncService
+import com.faithl.zephyrion.core.settings.AutoPickupSetting
+import com.faithl.zephyrion.core.settings.AutoReplaceSetting
 import com.faithl.zephyrion.core.ui.SearchUI
 import com.faithl.zephyrion.core.ui.UI
 import com.faithl.zephyrion.core.ui.search.SearchItem
 import com.faithl.zephyrion.core.ui.setRows6SplitBlock
+import com.faithl.zephyrion.core.ui.vault.settings.VaultSettingsUI
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import taboolib.common.platform.function.submit
@@ -160,6 +163,7 @@ class VaultUI(override val opener: Player, val vault: Vault, override val root: 
 
             setPageTurnItems(this)
             setSearchItem(this)
+            setSettingsItem(this)
             setReturnItem(this)
             setClickEvent(this)
         }
@@ -427,6 +431,28 @@ class VaultUI(override val opener: Player, val vault: Vault, override val root: 
                     }
                 }
             }
+        }
+    }
+
+    fun setSettingsItem(menu: StorableChest) {
+        // 检查玩家是否有至少一个设置权限
+        val hasAnySettingPermission = listOf(
+            AutoPickupSetting(opener, vault, null),
+            AutoReplaceSetting(opener, vault, null)
+        ).any { it.hasPermission() }
+
+        if (!hasAnySettingPermission) {
+            return
+        }
+
+        menu.set(45) {
+            buildItem(XMaterial.COMPARATOR) {
+                name = opener.asLangText("vault-main-settings")
+                lore += opener.asLangTextList("vault-main-settings-desc")
+            }
+        }
+        menu.onClick(45) {
+            VaultSettingsUI(opener, vault, this).open()
         }
     }
 

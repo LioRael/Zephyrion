@@ -29,7 +29,7 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, override va
 
     override fun search() {
         rules.clear()
-        rules.addAll(ZephyrionAPI.getAutoPickups(vault))
+        rules.addAll(ZephyrionAPI.getAutoPickups(vault, opener.uniqueId.toString()))
         if (params.isEmpty()) {
             return
         }
@@ -160,7 +160,7 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, override va
                 } else {
                     AutoPickupType.ITEM_NOT_PICKUP
                 }
-                val result = ZephyrionAPI.createAutoPickup(vault, ruleType, it)
+                val result = ZephyrionAPI.createAutoPickup(vault, ruleType, it, opener.uniqueId.toString())
                 if (result.success) {
                     opener.sendLang("auto-pickup-create-succeed")
                 } else {
@@ -176,7 +176,7 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, override va
 
     fun setInfoItem(menu: PageableChest<AutoPickup>) {
         menu.set(47) {
-            val allRules = ZephyrionAPI.getAutoPickups(vault)
+            val allRules = ZephyrionAPI.getAutoPickups(vault, opener.uniqueId.toString())
             val pickupCount = allRules.count { it.type == AutoPickupType.ITEM_PICKUP }
             val notPickupCount = allRules.count { it.type == AutoPickupType.ITEM_NOT_PICKUP }
 
@@ -199,7 +199,7 @@ class ListAutoPickups(override val opener: Player, val vault: Vault, override va
             opener.sendLang("auto-pickup-clear-tip")
             opener.nextChat {
                 if (it == "Y") {
-                    val count = ZephyrionAPI.clearAutoPickups(vault)
+                    val count = ZephyrionAPI.clearAutoPickups(vault, opener.uniqueId.toString())
                     opener.sendLang("auto-pickup-clear-succeed", count)
                 } else {
                     opener.sendLang("auto-pickup-clear-canceled")

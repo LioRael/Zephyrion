@@ -8,8 +8,6 @@ plugins {
     kotlin("jvm") version "1.9.0"
 }
 
-val exposedVersion: String by project
-
 taboolib {
     env {
         install(

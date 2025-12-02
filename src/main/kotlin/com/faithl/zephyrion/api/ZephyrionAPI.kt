@@ -156,8 +156,8 @@ object ZephyrionAPI {
         return Item.removeItem(vault, page, slot, player)
     }
 
-    fun newSetting(vault: Vault, setting: String, value: String) {
-        Setting.create(vault, setting, value)
+    fun newSetting(vault: Vault, setting: String, value: String, owner: String) {
+        Setting.create(vault, setting, value, owner)
     }
 
     /**
@@ -253,24 +253,24 @@ object ZephyrionAPI {
     // ==================== 自动拾取管理 API ====================
 
     /**
-     * 获取保险库的所有自动拾取规则
+     * 获取保险库的所有自动拾取规则（按 owner 过滤）
      */
-    fun getAutoPickups(vault: Vault): List<AutoPickup> {
-        return AutoPickup.getAutoPickups(vault)
+    fun getAutoPickups(vault: Vault, owner: String): List<AutoPickup> {
+        return AutoPickup.getAutoPickups(vault, owner)
     }
 
     /**
      * 获取保险库的指定类型的自动拾取规则
      */
-    fun getAutoPickupsByType(vault: Vault, type: AutoPickupType): List<AutoPickup> {
-        return AutoPickup.getAutoPickupsByType(vault, type)
+    fun getAutoPickupsByType(vault: Vault, type: AutoPickupType, owner: String): List<AutoPickup> {
+        return AutoPickup.getAutoPickupsByType(vault, type, owner)
     }
 
     /**
      * 创建自动拾取规则
      */
-    fun createAutoPickup(vault: Vault, type: AutoPickupType, value: String): Result {
-        val result = AutoPickup.createAutoPickup(vault, type, value)
+    fun createAutoPickup(vault: Vault, type: AutoPickupType, value: String, owner: String): Result {
+        val result = AutoPickup.createAutoPickup(vault, type, value, owner)
         if (result.success) {
             com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()
         }
@@ -289,10 +289,10 @@ object ZephyrionAPI {
     }
 
     /**
-     * 删除保险库的所有自动拾取规则
+     * 删除保险库指定 owner 的所有自动拾取规则
      */
-    fun clearAutoPickups(vault: Vault): Int {
-        val count = AutoPickup.clearAutoPickups(vault)
+    fun clearAutoPickups(vault: Vault, owner: String): Int {
+        val count = AutoPickup.clearAutoPickups(vault, owner)
         if (count > 0) {
             com.faithl.zephyrion.core.services.AutoPickupService.invalidateAllCache()
         }
@@ -313,7 +313,7 @@ object ZephyrionAPI {
     /**
      * 检查物品是否匹配自动拾取规则
      */
-    fun shouldAutoPickup(itemStack: ItemStack, vault: Vault): Boolean? {
-        return AutoPickup.shouldAutoPickup(itemStack, vault)
+    fun shouldAutoPickup(itemStack: ItemStack, vault: Vault, owner: String): Boolean? {
+        return AutoPickup.shouldAutoPickup(itemStack, vault, owner)
     }
 }

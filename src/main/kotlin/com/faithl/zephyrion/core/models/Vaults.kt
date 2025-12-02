@@ -2,6 +2,7 @@ package com.faithl.zephyrion.core.models
 
 import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.cache.AutoPickupCache
+import com.faithl.zephyrion.core.cache.SettingCache
 import com.faithl.zephyrion.core.cache.ItemCache
 import com.faithl.zephyrion.core.cache.QuotaCache
 import com.faithl.zephyrion.core.cache.VaultCache
@@ -272,7 +273,8 @@ data class Vault(
         user.sizeUsed = newSizeUsed
         QuotaCache.update(workspace.owner, user)
         VaultCache.invalidate(id)
-        AutoPickupCache.invalidate(id)
+        AutoPickupCache.invalidateByVault(id)
+        SettingCache.invalidateByVault(id)
         ItemCache.invalidateAll(id)
 
         return true

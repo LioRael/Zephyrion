@@ -1,7 +1,7 @@
-auto-pick-items: zephyrion.auto-pick-items
-auto-replace-tool: zephyrion.auto-replace-tool
-#search-items: zephyrion.search-items
-
+vault:
+  setting:
+    auto-replace: zephyrion.vault.setting.auto-replace
+    auto-pick: zephyrion.vault.setting.auto-pick
 create-public-workspace: zephyrion.create-public-workspace
 create-private-workspace: zephyrion.create-private-workspace
 create-independent-workspace: zephyrion.create-independent-workspace

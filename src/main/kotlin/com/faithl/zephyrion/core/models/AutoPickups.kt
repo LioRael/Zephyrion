@@ -23,6 +23,7 @@ data class AutoPickup(
     var type: AutoPickupType,
     var value: String,
     var vaultId: Int,
+    var owner: String,
     var createdAt: Long,
     var updatedAt: Long
 ) : java.io.Serializable {
@@ -37,67 +38,71 @@ data class AutoPickup(
             get() = DatabaseConfig.dataSource
 
         /**
-         * 获取保险库的所有自动拾取规则（使用缓存）
+         * 获取保险库的所有自动拾取规则（使用缓存，按 owner 过滤）
          */
-        fun getAutoPickups(vault: Vault): List<AutoPickup> {
-            return AutoPickupCache.get(vault)
+        fun getAutoPickups(vault: Vault, owner: String): List<AutoPickup> {
+            return AutoPickupCache.get(vault, owner)
         }
 
         /**
          * 获取保险库的指定类型的自动拾取规则
          */
-        fun getAutoPickupsByType(vault: Vault, type: AutoPickupType): List<AutoPickup> {
-            return AutoPickupCache.get(vault).filter { it.type == type }
+        fun getAutoPickupsByType(vault: Vault, type: AutoPickupType, owner: String): List<AutoPickup> {
+            return AutoPickupCache.get(vault, owner).filter { it.type == type }
         }
 
         /**
          * 创建自动拾取规则
          */
-        fun createAutoPickup(vault: Vault, type: AutoPickupType, value: String): ZephyrionAPI.Result {
+        fun createAutoPickup(vault: Vault, type: AutoPickupType, value: String, owner: String): ZephyrionAPI.Result {
             if (value.isBlank()) {
                 return ZephyrionAPI.Result(false, "auto_pickup_value_empty")
             }
 
-            val cachedRules = AutoPickupCache.get(vault)
+            val cachedRules = AutoPickupCache.get(vault, owner)
             val existing = cachedRules.any { it.type == type && it.value == value }
 
             if (existing) {
                 return ZephyrionAPI.Result(false, "auto_pickup_already_exists")
             }
 
-            table.insert(dataSource, "type", "value", "vault_id", "created_at", "updated_at") {
+            table.insert(dataSource, "type", "value", "vault_id", "owner", "created_at", "updated_at") {
                 value(
                     type.name,
                     value,
                     vault.id,
+                    owner,
                     System.currentTimeMillis(),
                     System.currentTimeMillis()
                 )
             }
-            AutoPickupCache.invalidate(vault.id)
+            AutoPickupCache.invalidate(vault.id, owner)
             return ZephyrionAPI.Result(true)
         }
 
         /**
-         * 删除保险库的所有自动拾取规则
+         * 删除保险库指定 owner 的所有自动拾取规则
          */
-        fun clearAutoPickups(vault: Vault): Int {
-            val rules = getAutoPickups(vault)
+        fun clearAutoPickups(vault: Vault, owner: String): Int {
+            val rules = getAutoPickups(vault, owner)
             val count = rules.size
 
             table.delete(dataSource) {
-                where { "vault_id" eq vault.id }
+                where {
+                    "vault_id" eq vault.id
+                    and { "owner" eq owner }
+                }
             }
 
-            AutoPickupCache.invalidate(vault.id)
+            AutoPickupCache.invalidate(vault.id, owner)
             return count
         }
 
         /**
          * 检查物品是否匹配自动拾取规则
          */
-        fun shouldAutoPickup(itemStack: ItemStack, vault: Vault): Boolean? {
-            val rules = getAutoPickups(vault)
+        fun shouldAutoPickup(itemStack: ItemStack, vault: Vault, owner: String): Boolean? {
+            val rules = getAutoPickups(vault, owner)
             if (rules.isEmpty()) return null
 
             val itemMaterial = itemStack.type.name
@@ -193,7 +198,7 @@ data class AutoPickup(
         table.delete(dataSource) {
             where { "id" eq id }
         }
-        AutoPickupCache.invalidate(vaultId)
+        AutoPickupCache.invalidate(vaultId, owner)
         return true
     }
 
@@ -214,7 +219,7 @@ data class AutoPickup(
             where { "id" eq id }
         }
 
-        AutoPickupCache.invalidate(vaultId)
+        AutoPickupCache.invalidate(vaultId, owner)
         return ZephyrionAPI.Result(true)
     }
 }

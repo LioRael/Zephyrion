@@ -3,7 +3,9 @@ package com.faithl.zephyrion.core.services
 import com.faithl.zephyrion.Zephyrion
 import com.faithl.zephyrion.api.ZephyrionAPI
 import com.faithl.zephyrion.core.models.Item
+import com.faithl.zephyrion.core.models.Setting
 import com.faithl.zephyrion.core.models.Vault
+import com.faithl.zephyrion.core.settings.AutoReplaceSetting
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerItemBreakEvent
@@ -75,7 +77,7 @@ object AutoReplaceService {
         val brokenItem = event.brokenItem
         val brokenMaterial = brokenItem.type
 
-        val permission = Zephyrion.permissions.getString("auto-replace-tool") ?: "zephyrion.auto-replace-tool"
+        val permission = Zephyrion.permissions.getString("vault.setting.auto-replace") ?: "zephyrion.vault.setting.auto-replace"
         if (!player.hasPermission(permission) && !ZephyrionAPI.isPluginAdmin(player)) {
             return
         }
@@ -95,14 +97,27 @@ object AutoReplaceService {
             return
         }
 
+        val playerId = player.uniqueId.toString()
+
         // 获取同类型工具的材料集合
         val toolGroup = materialToGroup[brokenMaterial]?.toSet() ?: setOf(brokenMaterial)
 
-        // 收集所有仓库中匹配的物品
+        // 收集所有仓库中匹配的物品（仅检查启用了自动替换的仓库）
         val allItems = mutableListOf<Pair<Item, Vault>>()
         for (workspace in workspaces) {
             val vaults = ZephyrionAPI.getVaults(workspace)
             for (vault in vaults) {
+                // 检查该仓库是否启用了自动替换
+                val autoReplaceEnabled = Setting.getOrDefault(
+                    vault,
+                    AutoReplaceSetting.SETTING_KEY,
+                    playerId,
+                    "false"
+                ).toBoolean()
+                if (!autoReplaceEnabled) {
+                    continue
+                }
+
                 val items = Item.getItemsByMaterials(vault, toolGroup, player)
                 items.forEach { allItems.add(it to vault) }
             }
